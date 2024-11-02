@@ -606,7 +606,7 @@ module.exports = function (defaultFuncs, api, ctx) {
 			.then(utils.parseAndCheckLogin(ctx, defaultFuncs))
 			.then((resData) => {
 				if (utils.getType(resData) != "Array") {
-					throw { error: resData }
+					throw { error: "Not logged in", res: resData };
 				}
 				if (resData && resData[resData.length - 1].error_results > 0) throw resData[0].o0.errors;
 				if (resData[resData.length - 1].successful_results === 0) throw { error: "getSeqId: there was no successful_results", res: resData };
@@ -617,7 +617,7 @@ module.exports = function (defaultFuncs, api, ctx) {
 			})
 			.catch((err) => {
 				log.error("getSeqId", err);
-				//if (utils.getType(err) == "Object" && err.error === global.Fca.Require.Language.Index.ErrAppState) ctx.loggedIn = false;
+				if (utils.getType(err) == "Object") ctx.loggedIn = false;
 				return globalCallback(err);
 			});
 	};
