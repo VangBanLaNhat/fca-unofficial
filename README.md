@@ -1,4 +1,4 @@
-This repo is a fork from main repo and will usually have new features bundled faster than main repo (and maybe bundle some bugs, too).
+This repo will no longer be updated because it is too old, you can switch to the [ws3-fca](https://github.com/VangBanLaNhat/ws3-fca) project
 
 # Unofficial Facebook Chat API
 <a href="https://www.npmjs.com/package/fca-unofficial"><img alt="npm version" src="https://img.shields.io/npm/v/fca-unofficial.svg?style=flat-square"></a>
