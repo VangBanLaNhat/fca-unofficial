@@ -239,6 +239,19 @@ function buildAPI(globalOptions, html, jar) {
   //Map it to listenMqtt instead for backward compatibly.
   api.listen = api.listenMqtt;
 
+  // Keep fb_dtsg/jazoest fresh to reduce long-session send failures.
+  if (ctx.refreshDtsgTimer) {
+    clearInterval(ctx.refreshDtsgTimer);
+  }
+  if (typeof api.refreshFb_dtsg === "function") {
+    ctx.refreshDtsgTimer = setInterval(function () {
+      api.refreshFb_dtsg(function () {});
+    }, 2 * 60 * 60 * 1000);
+    if (ctx.refreshDtsgTimer && typeof ctx.refreshDtsgTimer.unref === "function") {
+      ctx.refreshDtsgTimer.unref();
+    }
+  }
+
   return [ctx, defaultFuncs, api];
 }
 
