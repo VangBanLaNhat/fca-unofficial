@@ -1,17 +1,19 @@
 var login = require('../../src/index.js');
 var fs = require('fs');
 var assert = require('assert');
+var loadEnvTestConfig = require('./env-test-config');
 
-var conf = JSON.parse(process.env.testconfig || fs.readFileSync('test/test-config.json', 'utf8'));
+var conf = loadEnvTestConfig();
 var credentials = {
   email: conf.user.email,
   password: conf.user.password,
 };
 
 var userIDs = conf.userIDs;
+var sendUserID = userIDs[0];
+var sendGroupID = conf.groupID;
 
 var options = { selfListen: true, listenEvents: true, logLevel: "silent"};
-var pageOptions = {logLevel: 'silent', pageID: conf.pageID};
 var getType = require('../../src/utils').getType;
 var formatDeltaMessage = require('../../src/utils').formatDeltaMessage;
 var shareAttachmentFixture = require('../data/shareAttach');
@@ -78,7 +80,7 @@ describe('Login:', function() {
       msg.body === body &&
       msg.isGroup === false
     );
-    api.sendMessage({body: body}, userID, checkErr(done));
+    api.sendMessage({body: body}, sendUserID, checkErr(done));
   });
 
   it('should send sticker message object (user)', function (done){
@@ -90,7 +92,7 @@ describe('Login:', function() {
       msg.attachments[0].stickerID === stickerID &&
       msg.isGroup === false
     );
-    api.sendMessage({sticker: stickerID}, userID, checkErr(done));
+    api.sendMessage({sticker: stickerID}, sendUserID, checkErr(done));
   });
 
   it('should send basic string (user)', function (done){
@@ -100,7 +102,7 @@ describe('Login:', function() {
       msg.body === body &&
       msg.isGroup === false
     );
-    api.sendMessage(body, userID, checkErr(done));
+    api.sendMessage(body, sendUserID, checkErr(done));
   });
 
   it('should get thread info (user)', function (done){
@@ -164,9 +166,9 @@ describe('Login:', function() {
       msg.body === body &&
       msg.isGroup === true
     );
-    api.sendMessage({body: body}, groupChatID, function(err, info){
+    api.sendMessage({body: body}, sendGroupID, function(err, info){
       checkErr(done)(err);
-      assert(groupChatID === info.threadID);
+      assert(sendGroupID === info.threadID);
     });
   });
 
@@ -177,9 +179,9 @@ describe('Login:', function() {
       msg.body === body &&
       msg.isGroup === true
     );
-    api.sendMessage(body, groupChatID, function(err, info) {
+    api.sendMessage(body, sendGroupID, function(err, info) {
       checkErr(done)(err);
-      assert(groupChatID === info.threadID);
+      assert(sendGroupID === info.threadID);
     });
   });
 
@@ -191,8 +193,8 @@ describe('Login:', function() {
         msg.attachments[0].type === 'sticker' &&
         msg.attachments[0].stickerID === stickerID;
     });
-    api.sendMessage({sticker: stickerID}, groupChatID, function (err, info) {
-      assert(groupChatID === info.threadID);
+    api.sendMessage({sticker: stickerID}, sendGroupID, function (err, info) {
+      assert(sendGroupID === info.threadID);
       checkErr(done)(err);
     });
   });
@@ -205,9 +207,9 @@ describe('Login:', function() {
     listen(done, function (msg) {
       return msg.type === 'message' && msg.body === body;
     });
-    api.sendMessage({attachment: attach, body: body}, groupChatID, function(err, info){
+    api.sendMessage({attachment: attach, body: body}, sendGroupID, function(err, info){
       checkErr(done)(err);
-      assert(groupChatID === info.threadID);
+      assert(sendGroupID === info.threadID);
     });
   });
 

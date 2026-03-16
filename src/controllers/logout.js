@@ -3,6 +3,74 @@
 var utils = require("../utils");
 var log = require("npmlog");
 
+function safeGetFrom(str, start, end) {
+  try {
+    return utils.getFrom(str, start, end);
+  } catch (_) {
+    return "";
+  }
+}
+
+function buildLogoutForm(resData, ctx) {
+  var jsmods = resData && resData.jsmods ? resData.jsmods : {};
+
+  // Legacy response path.
+  if (
+    Array.isArray(jsmods.instances) &&
+    jsmods.instances[0] &&
+    jsmods.instances[0][2] &&
+    jsmods.instances[0][2][0] &&
+    Array.isArray(jsmods.instances[0][2][0]) &&
+    Array.isArray(jsmods.markup)
+  ) {
+    var elem = jsmods.instances[0][2][0].filter(function(v) {
+      return v && v.value === "logout";
+    })[0];
+
+    if (elem && elem.markup && elem.markup.__m) {
+      var found = jsmods.markup.filter(function(v) {
+        return v && v[0] === elem.markup.__m;
+      })[0];
+      var html = found && found[1] ? found[1].__html : "";
+      if (html) {
+        return {
+          fb_dtsg: safeGetFrom(html, '"fb_dtsg" value="', '"') || ctx.fb_dtsg || "",
+          ref: safeGetFrom(html, '"ref" value="', '"'),
+          h: safeGetFrom(html, '"h" value="', '"')
+        };
+      }
+    }
+  }
+
+  // Newer response paths: scan all markup payloads for a logout form.
+  var markupList = Array.isArray(jsmods.markup) ? jsmods.markup : [];
+  for (var i = 0; i < markupList.length; i++) {
+    var htmlCandidate = markupList[i] && markupList[i][1] ? markupList[i][1].__html : "";
+    if (!htmlCandidate || htmlCandidate.indexOf("logout.php") === -1) {
+      continue;
+    }
+
+    var fbDtsg = safeGetFrom(htmlCandidate, '"fb_dtsg" value="', '"') || ctx.fb_dtsg || "";
+    var ref = safeGetFrom(htmlCandidate, '"ref" value="', '"');
+    var h = safeGetFrom(htmlCandidate, '"h" value="', '"');
+
+    if (fbDtsg) {
+      return {
+        fb_dtsg: fbDtsg,
+        ref: ref,
+        h: h
+      };
+    }
+  }
+
+  // Last-resort fallback.
+  return {
+    fb_dtsg: ctx.fb_dtsg || "",
+    ref: "",
+    h: ""
+  };
+}
+
 module.exports = function(defaultFuncs, api, ctx) {
   return function logout(callback) {
     var resolveFunc = function(){};
@@ -33,32 +101,20 @@ module.exports = function(defaultFuncs, api, ctx) {
       )
       .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
       .then(function(resData) {
-        var elem = resData.jsmods.instances[0][2][0].filter(function(v) {
-          return v.value === "logout";
-        })[0];
-
-        var html = resData.jsmods.markup.filter(function(v) {
-          return v[0] === elem.markup.__m;
-        })[0][1].__html;
-
-        var form = {
-          fb_dtsg: utils.getFrom(html, '"fb_dtsg" value="', '"'),
-          ref: utils.getFrom(html, '"ref" value="', '"'),
-          h: utils.getFrom(html, '"h" value="', '"')
-        };
-
+        var logoutForm = buildLogoutForm(resData, ctx);
         return defaultFuncs
-          .post("https://www.facebook.com/logout.php", ctx.jar, form)
+          .post("https://www.facebook.com/logout.php", ctx.jar, logoutForm)
           .then(utils.saveCookies(ctx.jar));
       })
       .then(function(res) {
-        if (!res.headers) {
-          throw { error: "An error occurred when logging out." };
+        if (res && res.headers && res.headers.location) {
+          return defaultFuncs
+            .get(res.headers.location, ctx.jar)
+            .then(utils.saveCookies(ctx.jar));
         }
 
-        return defaultFuncs
-          .get(res.headers.location, ctx.jar)
-          .then(utils.saveCookies(ctx.jar));
+        // Some responses do not provide redirect location anymore.
+        return res;
       })
       .then(function() {
         ctx.loggedIn = false;
