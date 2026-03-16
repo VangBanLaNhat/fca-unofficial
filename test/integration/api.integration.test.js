@@ -1,4 +1,4 @@
-var login = require('../index.js');
+var login = require('../../src/index.js');
 var fs = require('fs');
 var assert = require('assert');
 
@@ -12,9 +12,9 @@ var userIDs = conf.userIDs;
 
 var options = { selfListen: true, listenEvents: true, logLevel: "silent"};
 var pageOptions = {logLevel: 'silent', pageID: conf.pageID};
-var getType = require('../utils').getType;
-var formatDeltaMessage = require('../utils').formatDeltaMessage;
-var shareAttachmentFixture = require('./data/shareAttach');
+var getType = require('../../src/utils').getType;
+var formatDeltaMessage = require('../../src/utils').formatDeltaMessage;
+var shareAttachmentFixture = require('../data/shareAttach');
 
 var userID = conf.user.id;
 
@@ -32,13 +32,13 @@ describe('Login:', function() {
   process.on('SIGINT', () => api && !api.logout() && console.log("Logged out :)"));
   var tests = [];
   var stopListening;
-  this.timeout(20000);
+  jest.setTimeout(20000);
 
   function listen(done, matcher) {
     tests.push({matcher:matcher, done:done});
   }
 
-  before(function(done) {
+  beforeAll(function(done) {
     login(credentials, options, function (err, localAPI) {
       if(err) return done(err);
 
@@ -112,9 +112,9 @@ describe('Login:', function() {
         assert(!info.participantIDs.some(v => v.length == 0));
         assert(info.name != null);
         assert(info.messageCount != null && !isNaN(info.messageCount));
-        assert(info.hasOwnProperty('emoji'));
-        assert(info.hasOwnProperty('nicknames'));
-        assert(info.hasOwnProperty('color'));
+        assert(Object.prototype.hasOwnProperty.call(info, 'emoji'));
+        assert(Object.prototype.hasOwnProperty.call(info, 'nicknames'));
+        assert(Object.prototype.hasOwnProperty.call(info, 'color'));
         done();
       });
   });
@@ -265,7 +265,7 @@ describe('Login:', function() {
     api.addUserToGroup(id, groupChatID, function() {});
   });
 
-  xit('should get thread info (group)', function (done){
+  it.skip('should get thread info (group)', function (done){
       api.getThreadInfo(groupChatID, (err, info) => {
         if (err) done(err);
 
@@ -274,9 +274,9 @@ describe('Login:', function() {
         assert(!info.participantIDs.some(v => v.length == 0));
         assert(info.name != null);
         assert(info.messageCount != null && !isNaN(info.messageCount));
-        assert(info.hasOwnProperty('emoji'));
-        assert(info.hasOwnProperty('nicknames'));
-        assert(info.hasOwnProperty('color'));
+        assert(Object.prototype.hasOwnProperty.call(info, 'emoji'));
+        assert(Object.prototype.hasOwnProperty.call(info, 'nicknames'));
+        assert(Object.prototype.hasOwnProperty.call(info, 'color'));
         done();
       });
   });
@@ -356,9 +356,9 @@ describe('Login:', function() {
         assert(getType(v.fullName) === "String");
         assert(getType(v.profilePicture) === "String");
         assert(getType(v.type) === "String");
-        assert(v.hasOwnProperty("profileUrl"));  // This can be null if the account is disabled
+        assert(Object.prototype.hasOwnProperty.call(v, "profileUrl"));  // This can be null if the account is disabled
         assert(getType(v.isBirthday) === "Boolean");
-      })
+      });
       done();
     } catch(e){
       done(e);
@@ -379,7 +379,7 @@ describe('Login:', function() {
     api.logout(done);
   });
 
-  after(function (){
+  afterAll(function (){
     if (stopListening) stopListening();
   });
 });

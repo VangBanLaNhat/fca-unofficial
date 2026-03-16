@@ -4,7 +4,7 @@ var utils = require("../utils");
 var log = require("npmlog");
 
 module.exports = function(defaultFuncs, api, ctx) {
-  return function httpGet(url, form, callback, notAPI) {
+  return function httpPost(url, form, customHeader, callback, notAPI) {
     var resolveFunc = function(){};
     var rejectFunc = function(){};
 
@@ -13,12 +13,30 @@ module.exports = function(defaultFuncs, api, ctx) {
       rejectFunc = reject;
     });
 
-    if (!callback && (utils.getType(form) == "Function" || utils.getType(form) == "AsyncFunction")) {
+    if (utils.getType(form) == "Function" || utils.getType(form) == "AsyncFunction") {
       callback = form;
       form = {};
+      customHeader = {};
+    }
+
+    if (utils.getType(customHeader) == "Function" || utils.getType(customHeader) == "AsyncFunction") {
+      callback = customHeader;
+      customHeader = {};
+    }
+
+    if (utils.getType(customHeader) == "Boolean" && typeof callback === "undefined") {
+      notAPI = customHeader;
+      customHeader = {};
+    }
+
+    if (utils.getType(callback) == "Boolean" && typeof notAPI === "undefined") {
+      notAPI = callback;
+      callback = undefined;
     }
 
     form = form || {};
+    customHeader = customHeader || {};
+    notAPI = Boolean(notAPI);
 
     callback = callback || function(err, data) {
         if (err) return rejectFunc(err);
@@ -27,7 +45,7 @@ module.exports = function(defaultFuncs, api, ctx) {
 
     if (notAPI) {
       utils
-        .post(url, ctx.jar, form, ctx.globalOptions)
+        .post(url, ctx.jar, form, ctx.globalOptions, ctx, customHeader)
         .then(function(resData) {
           callback(null, resData.body.toString());
         })
@@ -37,7 +55,7 @@ module.exports = function(defaultFuncs, api, ctx) {
         });
     } else {
       defaultFuncs
-        .post(url, ctx.jar, form, {})
+        .post(url, ctx.jar, form, null, customHeader)
         .then(function(resData) {
           callback(null, resData.body.toString());
         })

@@ -6,10 +6,17 @@ var log = require("npmlog");
 function formatData(data) {
   var retObj = {};
 
+  if (!data || utils.getType(data) !== "Object") {
+    return retObj;
+  }
+
   for (var prop in data) {
     // eslint-disable-next-line no-prototype-builtins
     if (data.hasOwnProperty(prop)) {
       var innerObj = data[prop];
+      if (!innerObj) {
+        continue;
+      }
       retObj[prop] = {
         name: innerObj.name,
         firstName: innerObj.firstName,
@@ -60,7 +67,20 @@ module.exports = function(defaultFuncs, api, ctx) {
         if (resData.error) {
           throw resData;
         }
-        return callback(null, formatData(resData.payload.profiles));
+
+        var profiles =
+          resData && resData.payload && resData.payload.profiles
+            ? resData.payload.profiles
+            : null;
+
+        if (!profiles) {
+          throw {
+            error: "getUserInfo: missing profiles in response payload",
+            res: resData
+          };
+        }
+
+        return callback(null, formatData(profiles));
       })
       .catch(function(err) {
         log.error("getUserInfo", err);

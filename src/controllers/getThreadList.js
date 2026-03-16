@@ -9,8 +9,13 @@ function createProfileUrl(url, username, id) {
 }
 
 function formatParticipants(participants) {
-  return participants.edges.map((p)=>{
-    p = p.node.messaging_actor;
+  var edges = participants && Array.isArray(participants.edges)
+    ? participants.edges
+    : [];
+
+  return edges.map((p)=>{
+    p = p && p.node ? p.node.messaging_actor : null;
+    if (!p) return null;
     switch (p["__typename"]) {
       case "User":
         return {
@@ -20,7 +25,7 @@ function formatParticipants(participants) {
           shortName: p.short_name,
           gender: p.gender,
           url: p.url, // how about making it profileURL
-          profilePicture: p.big_image_src.uri,
+          profilePicture: p.big_image_src ? p.big_image_src.uri : null,
           username: (p.username||null),
           // TODO: maybe better names for these?
           isViewerFriend: p.is_viewer_friend, // true/false
@@ -36,7 +41,7 @@ function formatParticipants(participants) {
           userID: utils.formatID(p.id.toString()), // or maybe... pageID?
           name: p.name,
           url: p.url,
-          profilePicture: p.big_image_src.uri,
+          profilePicture: p.big_image_src ? p.big_image_src.uri : null,
           username: (p.username||null),
           // uhm... better names maybe?
           acceptsMessengerUserFeedback: p.accepts_messenger_user_feedback, // true/false
@@ -51,7 +56,7 @@ function formatParticipants(participants) {
           userID: utils.formatID(p.id.toString()),
           name: p.name,
           url: createProfileUrl(p.url, p.username, p.id), // in this case p.url is null all the time
-          profilePicture: p.big_image_src.uri, // in this case it is default facebook photo, we could determine gender using it
+          profilePicture: p.big_image_src ? p.big_image_src.uri : null, // in this case it is default facebook photo, we could determine gender using it
           username: (p.username||null), // maybe we could use it to generate profile URL?
           isMessageBlockedByViewer: p.is_message_blocked_by_viewer, // true/false
         };
@@ -61,7 +66,7 @@ function formatParticipants(participants) {
           userID: utils.formatID(p.id.toString()),
           name: p.name, // "Facebook User" in user's language
           url: createProfileUrl(p.url, p.username, p.id), // in this case p.url is null all the time
-          profilePicture: p.big_image_src.uri, // default male facebook photo
+          profilePicture: p.big_image_src ? p.big_image_src.uri : null, // default male facebook photo
           username: (p.username||null), // maybe we could use it to generate profile URL?
           isMessageBlockedByViewer: p.is_message_blocked_by_viewer, // true/false
         };
@@ -73,7 +78,7 @@ function formatParticipants(participants) {
           name: p.name || `[unknown ${p["__typename"]}]`, // probably it will always be something... but fallback to [unknown], just in case
         };
     }
-  });
+  }).filter(Boolean);
 }
 
 // "FF8C0077" -> "8C0077"
@@ -85,9 +90,14 @@ function formatColor(color) {
 }
 
 function getThreadName(t) {
+  if (!t || !t.thread_key) return null;
   if (t.name || t.thread_key.thread_fbid) return t.name;
 
-  for (let po of t.all_participants.edges) {
+  var edges = t.all_participants && Array.isArray(t.all_participants.edges)
+    ? t.all_participants.edges
+    : [];
+
+  for (let po of edges) {
     let p = po.node;
     if (p.messaging_actor.id === t.thread_key.other_user_id) return p.messaging_actor.name;
   }
@@ -103,7 +113,11 @@ function mapNicknames(customizationInfo) {
 }
 
 function formatThreadList(data) {
+  if (!Array.isArray(data)) return [];
+
   return data.map(t => {
+    if (!t) return null;
+    var participants = formatParticipants(t.all_participants);
     let lastMessageNode = (t.last_message&&t.last_message.nodes&&t.last_message.nodes.length>0)?t.last_message.nodes[0]:null;
     return {
       threadID: t.thread_key?utils.formatID(t.thread_key.thread_fbid || t.thread_key.other_user_id):null, // shall never be null
@@ -115,8 +129,8 @@ function formatThreadList(data) {
       color: formatColor(t.customization_info?t.customization_info.outgoing_bubble_color:null),
       nicknames: mapNicknames(t.customization_info),
       muteUntil: t.mute_until,
-      participants: formatParticipants(t.all_participants),
-      adminIDs: t.thread_admins.map(a => a.id),
+      participants: participants,
+      adminIDs: Array.isArray(t.thread_admins) ? t.thread_admins.map(a => a.id) : [],
       folder: t.folder,
       isGroup: t.thread_type === "GROUP",
       // rtc_call_data: t.rtc_call_data, // TODO: format and document this
@@ -145,10 +159,10 @@ function formatThreadList(data) {
       approvalMode: Boolean(t.approval_mode),
 
       // @Legacy
-      participantIDs: formatParticipants(t.all_participants).map(participant => participant.userID),
+      participantIDs: participants.map(participant => participant.userID),
       threadType: t.thread_type === "GROUP" ? 2 : 1 // "GROUP" or "ONE_TO_ONE"
     };
-  });
+  }).filter(Boolean);
 }
 
 module.exports = function(defaultFuncs, api, ctx) {
@@ -209,6 +223,10 @@ module.exports = function(defaultFuncs, api, ctx) {
       .post("https://www.facebook.com/api/graphqlbatch/", ctx.jar, form)
       .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
       .then((resData) => {
+        if (!Array.isArray(resData) || resData.length === 0) {
+          throw {error: "getThreadList: invalid graphql response", res: resData};
+        }
+
         if (resData[resData.length - 1].error_results > 0) {
           throw resData[0].o0.errors;
         }
@@ -224,9 +242,27 @@ module.exports = function(defaultFuncs, api, ctx) {
         // this way user asks for 10 threads, we are asking for 11,
         // but after removing the duplicated one, it is again 10
         if (timestamp) {
-          resData[0].o0.data.viewer.message_threads.nodes.shift();
+          var nodes =
+            resData[0] && resData[0].o0 && resData[0].o0.data && resData[0].o0.data.viewer &&
+            resData[0].o0.data.viewer.message_threads
+              ? resData[0].o0.data.viewer.message_threads.nodes
+              : null;
+          if (Array.isArray(nodes)) {
+            nodes.shift();
+          }
         }
-        callback(null, formatThreadList(resData[0].o0.data.viewer.message_threads.nodes));
+
+        var threadNodes =
+          resData[0] && resData[0].o0 && resData[0].o0.data && resData[0].o0.data.viewer &&
+          resData[0].o0.data.viewer.message_threads
+            ? resData[0].o0.data.viewer.message_threads.nodes
+            : null;
+
+        if (!Array.isArray(threadNodes)) {
+          throw {error: "getThreadList: missing thread nodes", res: resData[0]};
+        }
+
+        callback(null, formatThreadList(threadNodes));
       })
       .catch((err) => {
         log.error("getThreadList", err);

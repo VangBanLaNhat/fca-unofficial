@@ -3,11 +3,55 @@
 var utils = require("./utils");
 var cheerio = require("cheerio");
 var log = require("npmlog");
+var controllers = require("./controllers");
 
 var checkVerified = null;
 
 var defaultLogRecordSize = 100;
 log.maxRecordSize = defaultLogRecordSize;
+
+function normalizeAppState(appState) {
+  if (utils.getType(appState) === "String") {
+    return appState
+      .split(";")
+      .map(function (cookie) {
+        var kv = cookie.split("=");
+        var key = (kv[0] || "").trim();
+        var value = (kv[1] || "").trim();
+        if (!key) return null;
+        return {
+          key: key,
+          value: value,
+          domain: ".facebook.com",
+          path: "/",
+          expires: Date.now() + 1000 * 60 * 60 * 24 * 365
+        };
+      })
+      .filter(Boolean);
+  }
+
+  if (utils.getType(appState) === "Array") {
+    return appState.map(function (cookie) {
+      var c = Object.assign({}, cookie);
+      if (!c.key && c.name) c.key = c.name;
+      if (!c.domain) c.domain = ".facebook.com";
+      if (!c.path) c.path = "/";
+      return c;
+    });
+  }
+
+  return appState;
+}
+
+function getRegionFromEndpoint(mqttEndpoint) {
+  if (!mqttEndpoint) return null;
+  try {
+    var region = new URL(mqttEndpoint).searchParams.get("region");
+    return region ? region.toUpperCase() : null;
+  } catch (_) {
+    return null;
+  }
+}
 
 function setOptions(globalOptions, options) {
   Object.keys(options).map(function (key) {
@@ -78,6 +122,12 @@ function buildAPI(globalOptions, html, jar) {
   });
 
   if (maybeCookie.length === 0) {
+    maybeCookie = jar.getCookies("https://www.facebook.com").filter(function (val) {
+      return val.cookieString().split("=")[0] === "i_user";
+    });
+  }
+
+  if (maybeCookie.length === 0) {
     throw { error: "Error retrieving userID. This can be caused by a lot of things, including getting blocked by Facebook for logging in from an unknown location. Try logging in with a browser to verify." };
   }
 
@@ -104,22 +154,28 @@ function buildAPI(globalOptions, html, jar) {
   if (oldFBMQTTMatch) {
     irisSeqID = oldFBMQTTMatch[1];
     mqttEndpoint = oldFBMQTTMatch[2];
-    region = new URL(mqttEndpoint).searchParams.get("region").toUpperCase();
-    log.info("login", `Got this account's message region: ${region}`);
+    region = getRegionFromEndpoint(mqttEndpoint);
+    if (region) {
+      log.info("login", `Got this account's message region: ${region}`);
+    }
   } else {
     let newFBMQTTMatch = html.match(/{"app_id":"219994525426954","endpoint":"(.+?)","iris_seq_id":"(.+?)"}/);
     if (newFBMQTTMatch) {
       irisSeqID = newFBMQTTMatch[2];
       mqttEndpoint = newFBMQTTMatch[1].replace(/\\\//g, "/");
-      region = new URL(mqttEndpoint).searchParams.get("region").toUpperCase();
-      log.info("login", `Got this account's message region: ${region}`);
+      region = getRegionFromEndpoint(mqttEndpoint);
+      if (region) {
+        log.info("login", `Got this account's message region: ${region}`);
+      }
     } else {
       let legacyFBMQTTMatch = html.match(/(\["MqttWebConfig",\[\],{fbid:")(.+?)(",appID:219994525426954,endpoint:")(.+?)(",pollingEndpoint:")(.+?)(3790])/);
       if (legacyFBMQTTMatch) {
         mqttEndpoint = legacyFBMQTTMatch[4];
-        region = new URL(mqttEndpoint).searchParams.get("region").toUpperCase();
+        region = getRegionFromEndpoint(mqttEndpoint);
         log.warn("login", `Cannot get sequence ID with new RegExp. Fallback to old RegExp (without seqID)...`);
-        log.info("login", `Got this account's message region: ${region}`);
+        if (region) {
+          log.info("login", `Got this account's message region: ${region}`);
+        }
         log.info("login", `[Unused] Polling endpoint: ${legacyFBMQTTMatch[6]}`);
       } else {
         log.warn("login", "Cannot get MQTT region & sequence ID.");
@@ -158,65 +214,13 @@ function buildAPI(globalOptions, html, jar) {
     api["htmlData"] = noMqttData;
   }
 
-  const apiFuncNames = [
-    'addExternalModule',
-    'addUserToGroup',
-    'changeAdminStatus',
-    'changeArchivedStatus',
-    'changeBio',
-    'changeBlockedStatus',
-    'changeGroupImage',
-    'changeNickname',
-    'changeThreadColor',
-    'changeThreadEmoji',
-    'createNewGroup',
-    'createPoll',
-    'deleteMessage',
-    'deleteThread',
-    'editMessage',
-    'forwardAttachment',
-    'getCurrentUserID',
-    'getEmojiUrl',
-    'getFriendsList',
-    'getThreadHistory',
-    'getThreadInfo',
-    'getThreadList',
-    'getThreadPictures',
-    'getUserID',
-    'getUserInfo',
-    'handleMessageRequest',
-    'listenMqtt',
-    'logout',
-    'markAsDelivered',
-    'markAsRead',
-    'markAsReadAll',
-    'markAsSeen',
-    'muteThread',
-    'removeUserFromGroup',
-    'resolvePhotoUrl',
-    'searchForThread',
-    'sendMessage',
-    'sendTypingIndicator',
-    'setMessageReaction',
-    'setTitle',
-    'threadColors',
-    'unsendMessage',
-
-    // HTTP
-    'httpGet',
-    'httpPost',
-
-    // Deprecated features
-    "getThreadListDeprecated",
-    'getThreadHistoryDeprecated',
-    'getThreadInfoDeprecated',
-  ];
+  var apiFuncNames = Object.keys(controllers);
 
   var defaultFuncs = utils.makeDefaults(html, userID, ctx);
 
   // Load all api functions in a loop
   apiFuncNames.map(function (v) {
-    api[v] = require('./src/' + v)(defaultFuncs, api, ctx);
+    api[v] = controllers[v](defaultFuncs, api, ctx);
   });
 
   //Removing original `listen` that uses pull.
@@ -484,7 +488,10 @@ function loginHelper(appState, email, password, globalOptions, callback, prCallb
   // If we're given an appState we loop through it and save each cookie
   // back into the jar.
   if (appState) {
+    appState = normalizeAppState(appState);
+
     appState.map(function (c) {
+      if (!c || !c.key) return;
       var str = c.key + "=" + c.value + "; expires=" + c.expires + "; domain=" + c.domain + "; path=" + c.path + ";";
       jar.setCookie(str, "http://" + c.domain);
     });

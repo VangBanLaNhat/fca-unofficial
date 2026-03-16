@@ -4,6 +4,10 @@ var utils = require("../utils");
 var log = require("npmlog");
 
 function formatAttachmentsGraphQLResponse(attachment) {
+  if (!attachment) {
+    return { error: "Empty attachment payload" };
+  }
+
   switch (attachment.__typename) {
     case "MessageImage":
       return {
@@ -138,6 +142,10 @@ function formatAttachmentsGraphQLResponse(attachment) {
 
 function formatExtensibleAttachment(attachment) {
   if (attachment.story_attachment) {
+    var properties = Array.isArray(attachment.story_attachment.properties)
+      ? attachment.story_attachment.properties
+      : [];
+
     return {
       type: "share",
       ID: attachment.legacy_attachment_id,
@@ -210,10 +218,11 @@ function formatExtensibleAttachment(attachment) {
       //     width: "1280"
       //   }
       //
-      properties: attachment.story_attachment.properties.reduce(function(
+      properties: properties.reduce(function(
         obj,
         cur
       ) {
+        if (!cur || !cur.key || !cur.value) return obj;
         obj[cur.key] = cur.value.text;
         return obj;
       },
@@ -261,9 +270,13 @@ function formatExtensibleAttachment(attachment) {
 }
 
 function formatReactionsGraphQL(reaction) {
+  if (!reaction) {
+    return null;
+  }
+
   return {
     reaction: reaction.reaction,
-    userID: reaction.user.id
+    userID: reaction.user ? reaction.user.id : null
   };
 }
 
@@ -352,12 +365,37 @@ function formatEventData(event) {
 }
 
 function formatMessagesGraphQLResponse(data) {
-  var messageThread = data.o0.data.message_thread;
+  if (!data) {
+    throw { error: "getThreadHistoryGraphQL: empty response payload" };
+  }
+
+  var messageThread =
+    data.message_thread ||
+    (data.o0 && data.o0.data ? data.o0.data.message_thread : null);
+
+  if (!messageThread || !messageThread.thread_key) {
+    throw {
+      error: "getThreadHistoryGraphQL: invalid message thread payload",
+      res: data
+    };
+  }
+
   var threadID = messageThread.thread_key.thread_fbid
     ? messageThread.thread_key.thread_fbid
     : messageThread.thread_key.other_user_id;
 
-  var messages = messageThread.messages.nodes.map(function(d) {
+  var messageNodes =
+    messageThread.messages && Array.isArray(messageThread.messages.nodes)
+      ? messageThread.messages.nodes
+      : [];
+
+  var messages = messageNodes.map(function(d) {
+    if (!d) {
+      return { error: "Empty message payload" };
+    }
+
+    var senderID = d.message_sender ? d.message_sender.id : null;
+
     switch (d.__typename) {
       case "UserMessage":
         // Give priority to stickers. They're seen as normal messages but we've
@@ -370,7 +408,7 @@ function formatMessagesGraphQLResponse(data) {
               ID: d.sticker.id,
               url: d.sticker.url,
 
-              packID: d.sticker.pack.id,
+              packID: d.sticker.pack ? d.sticker.pack.id : null,
               spriteUrl: d.sticker.sprite_image,
               spriteUrl2x: d.sticker.sprite_image_2x,
               width: d.sticker.width,
@@ -392,9 +430,11 @@ function formatMessagesGraphQLResponse(data) {
         }
 
         var mentionsObj = {};
-        if (d.message !== null) {
-          d.message.ranges.forEach(e => {
-            mentionsObj[e.entity.id] = d.message.text.substr(e.offset, e.length);
+        if (d.message && Array.isArray(d.message.ranges)) {
+          d.message.ranges.forEach(function(e) {
+            if (!e || !e.entity) return;
+            var text = d.message && d.message.text ? d.message.text : "";
+            mentionsObj[e.entity.id] = text.substr(e.offset, e.length);
           });
         }
 
@@ -404,13 +444,14 @@ function formatMessagesGraphQLResponse(data) {
             ? maybeStickerAttachment
             : d.blob_attachments && d.blob_attachments.length > 0
               ? d.blob_attachments.map(formatAttachmentsGraphQLResponse)
+              .filter(Boolean)
               : d.extensible_attachment
                 ? [formatExtensibleAttachment(d.extensible_attachment)]
                 : [],
           body: d.message !== null ? d.message.text : '',
           isGroup: messageThread.thread_type === "GROUP",
           messageID: d.message_id,
-          senderID: d.message_sender.id,
+          senderID: senderID,
           threadID: threadID,
           timestamp: d.timestamp_precise,
 
@@ -419,7 +460,7 @@ function formatMessagesGraphQLResponse(data) {
 
           // New
           messageReactions: d.message_reactions
-            ? d.message_reactions.map(formatReactionsGraphQL)
+            ? d.message_reactions.map(formatReactionsGraphQL).filter(Boolean)
             : null,
           isSponsored: d.is_sponsored,
           snippet: d.snippet
@@ -430,7 +471,7 @@ function formatMessagesGraphQLResponse(data) {
           messageID: d.message_id,
           threadID: threadID,
           isGroup: messageThread.thread_type === "GROUP",
-          senderID: d.message_sender.id,
+          senderID: senderID,
           timestamp: d.timestamp_precise,
           eventType: "change_thread_name",
           snippet: d.snippet,
@@ -439,7 +480,7 @@ function formatMessagesGraphQLResponse(data) {
           },
 
           // @Legacy
-          author: d.message_sender.id,
+          author: senderID,
           logMessageType: "log:thread-name",
           logMessageData: { name: d.thread_name }
         };
@@ -449,7 +490,7 @@ function formatMessagesGraphQLResponse(data) {
           messageID: d.message_id,
           threadID: threadID,
           isGroup: messageThread.thread_type === "GROUP",
-          senderID: d.message_sender.id,
+          senderID: senderID,
           timestamp: d.timestamp_precise,
           eventType: "change_thread_image",
           snippet: d.snippet,
@@ -480,13 +521,13 @@ function formatMessagesGraphQLResponse(data) {
           messageID: d.message_id,
           threadID: threadID,
           isGroup: messageThread.thread_type === "GROUP",
-          senderID: d.message_sender.id,
+          senderID: senderID,
           timestamp: d.timestamp_precise,
           eventType: "remove_participants",
           snippet: d.snippet,
           eventData: {
             // Array of IDs.
-            participantsRemoved: d.participants_removed.map(function(p) {
+            participantsRemoved: (Array.isArray(d.participants_removed) ? d.participants_removed : []).map(function(p) {
               return p.id;
             })
           },
@@ -494,7 +535,7 @@ function formatMessagesGraphQLResponse(data) {
           // @Legacy
           logMessageType: "log:unsubscribe",
           logMessageData: {
-            leftParticipantFbId: d.participants_removed.map(function(p) {
+            leftParticipantFbId: (Array.isArray(d.participants_removed) ? d.participants_removed : []).map(function(p) {
               return p.id;
             })
           }
@@ -505,13 +546,13 @@ function formatMessagesGraphQLResponse(data) {
           messageID: d.message_id,
           threadID: threadID,
           isGroup: messageThread.thread_type === "GROUP",
-          senderID: d.message_sender.id,
+          senderID: senderID,
           timestamp: d.timestamp_precise,
           eventType: "add_participants",
           snippet: d.snippet,
           eventData: {
             // Array of IDs.
-            participantsAdded: d.participants_added.map(function(p) {
+            participantsAdded: (Array.isArray(d.participants_added) ? d.participants_added : []).map(function(p) {
               return p.id;
             })
           },
@@ -519,7 +560,7 @@ function formatMessagesGraphQLResponse(data) {
           // @Legacy
           logMessageType: "log:subscribe",
           logMessageData: {
-            addedParticipants: d.participants_added.map(function(p) {
+            addedParticipants: (Array.isArray(d.participants_added) ? d.participants_added : []).map(function(p) {
               return p.id;
             })
           }
@@ -530,7 +571,7 @@ function formatMessagesGraphQLResponse(data) {
           messageID: d.message_id,
           threadID: threadID,
           isGroup: messageThread.thread_type === "GROUP",
-          senderID: d.message_sender.id,
+          senderID: senderID,
           timestamp: d.timestamp_precise,
           eventType: "video_call",
           snippet: d.snippet,
@@ -544,7 +585,7 @@ function formatMessagesGraphQLResponse(data) {
           messageID: d.message_id,
           threadID: threadID,
           isGroup: messageThread.thread_type === "GROUP",
-          senderID: d.message_sender.id,
+          senderID: senderID,
           timestamp: d.timestamp_precise,
           eventType: "voice_call",
           snippet: d.snippet,
@@ -558,10 +599,12 @@ function formatMessagesGraphQLResponse(data) {
           messageID: d.message_id,
           threadID: threadID,
           isGroup: messageThread.thread_type === "GROUP",
-          senderID: d.message_sender.id,
+          senderID: senderID,
           timestamp: d.timestamp_precise,
           snippet: d.snippet,
-          eventType: d.extensible_message_admin_text_type.toLowerCase(),
+          eventType: d.extensible_message_admin_text_type
+            ? d.extensible_message_admin_text_type.toLowerCase()
+            : "unknown_admin_event",
           eventData: formatEventData(d.extensible_message_admin_text),
 
           // @Legacy
@@ -623,6 +666,13 @@ module.exports = function(defaultFuncs, api, ctx) {
       .post("https://www.facebook.com/api/graphqlbatch/", ctx.jar, form)
       .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
       .then(function(resData) {
+        if (!Array.isArray(resData) || resData.length === 0) {
+          throw {
+            error: "getThreadHistoryGraphQL: invalid graphql response",
+            res: resData
+          };
+        }
+
         if (resData.error) {
           throw resData;
         }
@@ -631,6 +681,13 @@ module.exports = function(defaultFuncs, api, ctx) {
         // @TODO What do we do in this case?
         if (resData[resData.length - 1].error_results !== 0) {
           throw new Error("There was an error_result.");
+        }
+
+        if (resData[resData.length - 1].successful_results === 0) {
+          throw {
+            error: "getThreadHistoryGraphQL: there was no successful_results",
+            res: resData
+          };
         }
 
         callback(null, formatMessagesGraphQLResponse(resData[0]));

@@ -1,9 +1,11 @@
 # Documentation
 
 * [`login`](#login)
+* [`api.addExternalModule`](#addExternalModule)
 * [`api.addUserToGroup`](#addUserToGroup)
 * [`api.changeAdminStatus`](#changeAdminStatus)
 * [`api.changeArchivedStatus`](#changeArchivedStatus)
+* [`api.changeBio`](#changeBio)
 * [`api.changeBlockedStatus`](#changeBlockedStatus)
 * [`api.changeGroupImage`](#changeGroupImage)
 * [`api.changeNickname`](#changeNickname)
@@ -20,12 +22,17 @@
 * [`api.getEmojiUrl`](#getEmojiUrl)
 * [`api.getFriendsList`](#getFriendsList)
 * [`api.getThreadHistory`](#getThreadHistory)
+* [`api.getThreadHistoryDeprecated`](#getThreadHistoryDeprecated)
 * [`api.getThreadInfo`](#getThreadInfo)
+* [`api.getThreadInfoDeprecated`](#getThreadInfoDeprecated)
 * [`api.getThreadList`](#getThreadList)
+* [`api.getThreadListDeprecated`](#getThreadListDeprecated)
 * [`api.getThreadPictures`](#getThreadPictures)
 * [`api.getUserID`](#getUserID)
 * [`api.getUserInfo`](#getUserInfo)
 * [`api.handleMessageRequest`](#handleMessageRequest)
+* [`api.httpGet`](#httpGet)
+* [`api.httpPost`](#httpPost)
 * [`api.listen`](#listen)
 * [`api.listenMqtt`](#listenMqtt)
 * [`api.logout`](#logout)
@@ -44,6 +51,16 @@
 * [`api.setTitle`](#setTitle)
 * [`api.threadColors`](#threadColors)
 * [`api.unsendMessage`](#unsendMessage)
+
+---------------------------------------
+
+### Testing
+
+Run the test suites with the current Jest scripts:
+
+* `npm test`: Unit tests only (integration tests excluded by default).
+* `npm run test:unit`: Full unit test run.
+* `npm run test:integration`: Integration tests under `test/integration`.
 
 ---------------------------------------
 
@@ -179,6 +196,35 @@ __Review Recent Login__: Sometimes Facebook will ask you to review your recent l
 
 ---------------------------------------
 
+<a name="addExternalModule"></a>
+### api.addExternalModule(moduleObj)
+
+Adds external API methods at runtime.
+
+__Arguments__
+
+* `moduleObj`: An object where each key is the method name to expose on `api`.
+* Each value in `moduleObj` must be a factory function with signature `(defaultFuncs, api, ctx) => handler`.
+
+If `moduleObj` is not an object, or any item is not a function, this method throws an `Error`.
+
+__Example__
+
+```js
+api.addExternalModule({
+	ping: (defaultFuncs, api, ctx) => function ping(callback) {
+		callback(null, { userID: ctx.userID, ok: true });
+	}
+});
+
+api.ping((err, data) => {
+	if (err) return console.error(err);
+	console.log(data);
+});
+```
+
+---------------------------------------
+
 <a name="addUserToGroup"></a>
 ### api.addUserToGroup(userID, threadID[, callback])
 
@@ -253,6 +299,21 @@ login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, ap
     });
 });
 ```
+
+---------------------------------------
+
+<a name="changeBio"></a>
+### api.changeBio(bio[, publish][, callback])
+
+Updates the logged-in account biography using Facebook GraphQL.
+
+__Arguments__
+
+* `bio`: A string representing the new bio. If not a string, it falls back to an empty bio.
+* `publish`: (Optional) Boolean indicating whether to publish a feed story for this bio update. Defaults to `false`.
+* `callback(err)`: (Optional) Callback invoked when the update is done.
+
+This method also returns a Promise when callback is omitted.
 
 ---------------------------------------
 
@@ -644,6 +705,22 @@ function loadNextThreadHistory(api){
 
 ---------------------------------------
 
+<a name="getThreadHistoryDeprecated"></a>
+### api.getThreadHistoryDeprecated(threadID, amount, timestamp[, callback])
+
+Legacy thread history getter kept for backward compatibility.
+
+__Arguments__
+
+* `threadID`: Target thread ID.
+* `amount`: Number of messages to request.
+* `timestamp`: Timestamp anchor for paging history (`undefined` for most recent).
+* `callback(err, history)`: (Optional) Callback receiving an array of formatted messages.
+
+This method supports Promise usage when callback is omitted.
+
+---------------------------------------
+
 <a name="getThreadInfo"></a>
 ### api.getThreadInfo(threadID[, callback])
 
@@ -676,6 +753,20 @@ __Arguments__
 | adminIDs | Array of user IDs of the admins of the thread. Empty array if unset. |
 | approvalMode | `true` or `false`, used to check if this group requires admin approval to add users |
 | approvalQueue | Array of object that has the following keys: <ul><li>`inviterID`: ID of the user invited the person to the group</li><li>`requesterID`: ID of the person waiting to be approved</li><li>`timestamp`: Request timestamp</li></ul> |
+
+---------------------------------------
+
+<a name="getThreadInfoDeprecated"></a>
+### api.getThreadInfoDeprecated(threadID[, callback])
+
+Legacy thread info getter kept for backward compatibility.
+
+__Arguments__
+
+* `threadID`: Target thread ID.
+* `callback(err, info)`: (Optional) Callback receiving the formatted thread info.
+
+This method supports Promise usage when callback is omitted.
 
 ---------------------------------------
 
@@ -927,6 +1018,20 @@ In a case that some account type is not supported, we return just this *(but you
 
 ---------------------------------------
 
+<a name="getThreadListDeprecated"></a>
+### api.getThreadListDeprecated(start, end[, type], callback)
+
+Legacy thread list getter kept for backward compatibility.
+
+__Arguments__
+
+* `start`: Start offset.
+* `end`: End offset (if `end <= start`, `end` is internally set to `start + 20`).
+* `type`: (Optional) One of `inbox`, `pending`, `archived`, `other`. Defaults to `inbox`.
+* `callback(err, list)`: Callback receiving an array of formatted threads.
+
+---------------------------------------
+
 <a name="getThreadPictures"></a>
 ### api.getThreadPictures(threadID, offset, limit, callback)
 
@@ -1003,6 +1108,40 @@ login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, ap
     });
 });
 ```
+
+---------------------------------------
+
+<a name="httpGet"></a>
+### api.httpGet(url[, form][, customHeader][, callback][, notAPI])
+
+Performs an HTTP GET request and returns response body as string.
+
+__Arguments__
+
+* `url`: Target URL.
+* `form`: (Optional) Query/form object.
+* `customHeader`: (Optional) Header object.
+* `callback(err, data)`: (Optional) Callback receiving response body as string.
+* `notAPI`: (Optional) Boolean. If `true`, use lower-level `utils.get`; otherwise use `defaultFuncs.get`.
+
+This method supports Promise usage when callback is omitted.
+
+---------------------------------------
+
+<a name="httpPost"></a>
+### api.httpPost(url[, form][, customHeader][, callback][, notAPI])
+
+Performs an HTTP POST request and returns response body as string.
+
+__Arguments__
+
+* `url`: Target URL.
+* `form`: (Optional) Post body/form object.
+* `customHeader`: (Optional) Header object.
+* `callback(err, data)`: (Optional) Callback receiving response body as string.
+* `notAPI`: (Optional) Boolean. If `true`, use lower-level `utils.post`; otherwise use `defaultFuncs.post`.
+
+This method supports Promise usage when callback is omitted.
 
 ---------------------------------------
 
