@@ -117,6 +117,16 @@ function setOptions(globalOptions, options) {
 }
 
 function buildAPI(globalOptions, html, jar) {
+  var fbDtsgMatch = html.match(/DTSGInitialData.*?token":"(.*?)"/);
+  var initialFbDtsg = fbDtsgMatch ? fbDtsgMatch[1] : null;
+  var initialTtstamp = null;
+  if (initialFbDtsg) {
+    initialTtstamp = "2";
+    for (var idx = 0; idx < initialFbDtsg.length; idx++) {
+      initialTtstamp += initialFbDtsg.charCodeAt(idx);
+    }
+  }
+
   var maybeCookie = jar.getCookies("https://www.facebook.com").filter(function (val) {
     return val.cookieString().split("=")[0] === "c_user";
   });
@@ -200,7 +210,9 @@ function buildAPI(globalOptions, html, jar) {
     region,
     firstListen: true,
     wsReqNumber: 0,
-    wsTaskNumber: 0
+    wsTaskNumber: 0,
+    fb_dtsg: initialFbDtsg,
+    ttstamp: initialTtstamp
   };
 
   var api = {
@@ -530,6 +542,12 @@ function loginHelper(appState, email, password, globalOptions, callback, prCallb
       }
       return res;
     })
+    .then(function () {
+      // ws3 flow stabilizes appstate sessions by loading /home.php before building API.
+      return utils
+        .get("https://www.facebook.com/home.php", jar, null, globalOptions)
+        .then(utils.saveCookies(jar));
+    })
     .then(function (res) {
       var html = res.body;
       var stuff = buildAPI(globalOptions, html, jar);
@@ -585,8 +603,7 @@ function login(loginData, options, callback) {
     logRecordSize: defaultLogRecordSize,
     online: true,
     emitReady: false,
-    //userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8"
-    userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
+    userAgent: "facebookexternalhit/1.1"
   };
 
   setOptions(globalOptions, options);

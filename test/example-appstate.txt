@@ -1,0 +1,11 @@
+Put your Facebook app state JSON in:
+
+  test/appstate.json
+
+Or run the test with a custom path:
+
+  APPSTATE_PATH=/absolute/path/to/appstate.json npm run test:integration -- login.appstate.integration.test.js
+
+Notes:
+- File must be valid JSON array/object returned by api.getAppState().
+- The integration test is auto-skipped when test/appstate.json is missing.

@@ -16,6 +16,8 @@ var allowedProperties = {
 };
 
 module.exports = function (defaultFuncs, api, ctx) {
+  var sendMessageUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3";
+
   function uploadAttachment(attachments, callback) {
     var uploads = [];
 
@@ -137,7 +139,20 @@ module.exports = function (defaultFuncs, api, ctx) {
     }
 
     defaultFuncs
-      .post("https://www.facebook.com/messaging/send/", ctx.jar, form)
+      .post(
+        "https://www.facebook.com/messaging/send/",
+        ctx.jar,
+        form,
+        null,
+        {
+          customUserAgent: sendMessageUserAgent,
+          Referer: "https://www.facebook.com/",
+          Origin: "https://www.facebook.com",
+          Connection: "keep-alive",
+          "Sec-Fetch-Site": "same-origin",
+          "Sec-Fetch-User": "?1"
+        }
+      )
       .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
       .then(function (resData) {
         if (!resData) {
@@ -184,18 +199,8 @@ module.exports = function (defaultFuncs, api, ctx) {
       sendContent(form, threadID, false, messageAndOTID, callback);
     } else {
       if (utils.getType(isGroup) != "Boolean") {
-        api.getUserInfo(threadID, function (err, res) {
-          if (err) {
-            return callback(err);
-          }
-          sendContent(
-            form,
-            threadID,
-            Object.keys(res).length > 0,
-            messageAndOTID,
-            callback
-          );
-        });
+        // Match ws3 behavior: avoid extra lookup call that can fail on some sessions.
+        sendContent(form, threadID, threadID.length <= 15, messageAndOTID, callback);
       } else {
         sendContent(form, threadID, !isGroup, messageAndOTID, callback);
       }
@@ -316,7 +321,9 @@ module.exports = function (defaultFuncs, api, ctx) {
         }
 
         const id = mention.id || 0;
-        form["profile_xmd[" + i + "][offset]"] = offset;
+        const emptyChar = "\u200E";
+        form["body"] = emptyChar + msg.body;
+        form["profile_xmd[" + i + "][offset]"] = offset + 1;
         form["profile_xmd[" + i + "][length]"] = tag.length;
         form["profile_xmd[" + i + "][id]"] = id;
         form["profile_xmd[" + i + "][type]"] = "p";

@@ -23,19 +23,27 @@ function getHeaders(url, options, ctx, customHeader) {
     host = url.replace("https://", "").split("/")[0];
   }
 
+  var userAgent = customHeader && customHeader.customUserAgent
+    ? customHeader.customUserAgent
+    : options.userAgent;
+
   var headers = {
-    "Content-Type": "application/x-www-form-urlencoded",
-    Referer: "https://www.facebook.com/",
-    Host: host,
-    Origin: "https://www.facebook.com",
-    "User-Agent": options.userAgent,
-    Connection: "keep-alive"
+    host: host,
+    "content-type": "application/x-www-form-urlencoded",
+    referer: "https://www.facebook.com/",
+    origin: "https://www.facebook.com",
+    connection: "keep-alive",
+    "Sec-Fetch-Site": "same-origin",
+    "Sec-Fetch-User": "?1",
+    "User-Agent": userAgent
   };
   if (customHeader) {
     Object.assign(headers, customHeader);
     if (customHeader.noRef) {
-      delete headers.Referer;
+      delete headers.referer;
     }
+    delete headers.customUserAgent;
+    delete headers.noRef;
   }
   if (ctx && ctx.region) {
     headers["X-MSGR-Region"] = ctx.region;

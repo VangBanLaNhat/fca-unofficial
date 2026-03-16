@@ -22,6 +22,7 @@ function makeDefaults(html, userID, ctx) {
 
   function mergeWithDefaults(obj) {
     var newObj = {
+      av: userID,
       __user: userID,
       __req: (reqCounter++).toString(36),
       __rev: revision,

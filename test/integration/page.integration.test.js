@@ -1,8 +1,8 @@
 var login = require('../../src/index.js');
-var fs = require('fs');
 var assert = require('assert');
+var loadEnvTestConfig = require('./env-test-config');
 
-var conf =  JSON.parse(process.env.testconfig || fs.readFileSync('test/test-config.json', 'utf8'));
+var conf = loadEnvTestConfig();
 var credentials = {
   email: conf.user.email,
   password: conf.user.password,
@@ -13,8 +13,7 @@ var userIDs = conf.userIDs;
 var options = {
   selfListen: true,
   listenEvents: true,
-  logLevel: "silent",
-  pageID: conf.pageID
+  logLevel: "silent"
 };
 var getType = require('../../src/utils').getType;
 
