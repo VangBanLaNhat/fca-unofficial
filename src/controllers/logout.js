@@ -117,6 +117,10 @@ module.exports = function(defaultFuncs, api, ctx) {
         return res;
       })
       .then(function() {
+        if (ctx.refreshDtsgTimer) {
+          clearInterval(ctx.refreshDtsgTimer);
+          ctx.refreshDtsgTimer = null;
+        }
         ctx.loggedIn = false;
         log.info("logout", "Logged out successfully.");
         callback();
