@@ -1,4 +1,4 @@
-"use_strict";
+"use strict";
 
 var utils = require("../utils");
 var log = require("npmlog");
@@ -43,7 +43,7 @@ module.exports = function(defaultFuncs, api, ctx) {
       }),
       request_id: ++ctx.wsReqNumber,
       type: 3
-    }
+    };
 
     ctx.mqttClient.publish('/ls_req', JSON.stringify(content), {
       qos: 1, retain: false
@@ -59,7 +59,7 @@ module.exports = function(defaultFuncs, api, ctx) {
         let msgReplace = jsonMsg.payload.step[1][2][2][1][4];
         
         if (msgReplace != text) {
-          let err = {error: "The message is too old or not from you!"}
+          let err = {error: "The message is too old or not from you!"};
           log.error("editMessage", err);
           
           return callback(err, {
@@ -73,9 +73,9 @@ module.exports = function(defaultFuncs, api, ctx) {
           messageID: msgID
         });
       }
-    }
+    };
     ctx.mqttClient.on('message', handleRes);
     
     return returnPromise;
   };
-}
+};

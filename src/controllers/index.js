@@ -1,0 +1,56 @@
+"use strict";
+
+var controllerNames = [
+  "addExternalModule",
+  "addUserToGroup",
+  "changeAdminStatus",
+  "changeArchivedStatus",
+  "changeBio",
+  "changeBlockedStatus",
+  "changeGroupImage",
+  "changeNickname",
+  "changeThreadColor",
+  "changeThreadEmoji",
+  "createNewGroup",
+  "createPoll",
+  "deleteMessage",
+  "deleteThread",
+  "editMessage",
+  "forwardAttachment",
+  "getCurrentUserID",
+  "getEmojiUrl",
+  "getFriendsList",
+  "getThreadHistory",
+  "getThreadInfo",
+  "getThreadList",
+  "getThreadPictures",
+  "getUserID",
+  "getUserInfo",
+  "handleMessageRequest",
+  "listenMqtt",
+  "logout",
+  "markAsDelivered",
+  "markAsRead",
+  "markAsReadAll",
+  "markAsSeen",
+  "muteThread",
+  "removeUserFromGroup",
+  "resolvePhotoUrl",
+  "searchForThread",
+  "sendMessage",
+  "sendTypingIndicator",
+  "setMessageReaction",
+  "setTitle",
+  "threadColors",
+  "unsendMessage",
+  "httpGet",
+  "httpPost",
+  "getThreadListDeprecated",
+  "getThreadHistoryDeprecated",
+  "getThreadInfoDeprecated"
+];
+
+module.exports = controllerNames.reduce(function (acc, name) {
+  acc[name] = require("./" + name + ".js");
+  return acc;
+}, {});

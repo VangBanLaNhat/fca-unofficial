@@ -41,6 +41,31 @@ var topics = ["/legacy_web",
   */
 
 function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
+	ctx._stopListening = false;
+	ctx._mqttReconnectPending = false;
+
+	function scheduleReconnect() {
+		if (ctx._stopListening || !ctx.globalOptions.autoReconnect || ctx._mqttReconnectPending) return;
+		ctx._mqttReconnectPending = true;
+		setTimeout(function () {
+			ctx._mqttReconnectPending = false;
+			getSeqID();
+		}, 1000);
+	}
+
+	function cleanupMqttClient() {
+		if (!ctx.mqttClient) return;
+		try {
+			ctx.mqttClient.unsubscribe("/webrtc");
+			ctx.mqttClient.unsubscribe("/rtc_multi");
+			ctx.mqttClient.unsubscribe("/onevc");
+			ctx.mqttClient.publish("/browser_close", "{}");
+		} catch (_) { }
+		try {
+			ctx.mqttClient.end(false);
+		} catch (_) { }
+	}
+
 	//Don't really know what this does but I think it's for the active state?
 	//TODO: Move to ctx when implemented
 	var chatOn = ctx.globalOptions.online;
@@ -88,8 +113,8 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
 	var mqttClient = ctx.mqttClient;
 	mqttClient.on('error', function (err) {
 		log.error("listenMqtt", err);
-		mqttClient.end();
-		if (ctx.globalOptions.autoReconnect) getSeqID();
+		cleanupMqttClient();
+		if (ctx.globalOptions.autoReconnect) scheduleReconnect();
 		else {
 			globalCallback({
 				type: "stop_listen",
@@ -126,8 +151,8 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
 	mqttClient.publish("/foreground_state", JSON.stringify({"foreground": chatOn}), {qos: 1});
 
 		var rTimeout = setTimeout(function () {
-			mqttClient.end();
-			getSeqID();
+			cleanupMqttClient();
+			scheduleReconnect();
 		}, 3000);
 
 		ctx.tmsWait = function () {
@@ -138,7 +163,13 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
 	});
 
 	mqttClient.on('message', function (topic, message, _packet) {
-			const jsonMessage = JSON.parse(message.toString());
+			var jsonMessage;
+			try {
+				jsonMessage = JSON.parse(message.toString());
+			} catch (err) {
+				log.error("listenMqtt", err);
+				return;
+			}
 		if (topic === "/t_ms") {
 			if (ctx.tmsWait && typeof ctx.tmsWait == "function") ctx.tmsWait();
 
@@ -181,20 +212,14 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
 
 	});
 
-	process.on('SIGINT', function () {
-		process.kill(process.pid);
-	});
-
-	process.on('exit', (code) => {
-		
-	});
-	
 	mqttClient.on('close', function () {
-
+		if (ctx._stopListening) return;
+		scheduleReconnect();
 	});
 
 	mqttClient.on('disconnect',function () {
-		process.exit(7378278);
+		if (ctx._stopListening) return;
+		scheduleReconnect();
 	});
 }
 
@@ -627,6 +652,7 @@ module.exports = function (defaultFuncs, api, ctx) {
 			stopListening(callback) {
 				callback = callback || (() => { });
 				globalCallback = identity;
+				ctx._stopListening = true;
 				if (ctx.mqttClient) {
 					ctx.mqttClient.unsubscribe("/webrtc");
 					ctx.mqttClient.unsubscribe("/rtc_multi");

@@ -143,4 +143,4 @@ module.exports = {
       "timestamp": "1487078180265"
     }
   }
-}
+};

@@ -1,4 +1,4 @@
-var login = require('../index.js');
+var login = require('../../src/index.js');
 var fs = require('fs');
 var assert = require('assert');
 
@@ -16,7 +16,7 @@ var options = {
   logLevel: "silent",
   pageID: conf.pageID
 };
-var getType = require('../utils').getType;
+var getType = require('../../src/utils').getType;
 
 var userID = conf.user.id;
 
@@ -34,13 +34,13 @@ function checkErr(done){
 //   process.on('SIGINT', () => api && !api.logout() && console.log("Logged out :)"));
 //   var tests = [];
 //   var stopListening;
-//   this.timeout(20000);
+//   jest.setTimeout(20000);
 
 //   function listen(done, matcher) {
 //     tests.push({matcher:matcher, done:done});
 //   }
 
-//   before(function(done) {
+//   beforeAll(function(done) {
 //     login(credentials, options, function (err, localAPI) {
 //       if(err) return done(err);
 
@@ -134,7 +134,7 @@ function checkErr(done){
 //     api.logout(done);
 //   });
 
-//   after(function (){
+//   afterAll(function (){
 //     if (stopListening) stopListening();
 //   });
 // });

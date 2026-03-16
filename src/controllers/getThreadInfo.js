@@ -4,38 +4,65 @@ var utils = require("../utils");
 var log = require("npmlog");
 
 function formatEventReminders(reminder) {
+  if (!reminder) {
+    return null;
+  }
+
+  var members =
+    reminder.event_reminder_members &&
+    Array.isArray(reminder.event_reminder_members.edges)
+      ? reminder.event_reminder_members.edges
+      : [];
+
   return {
     reminderID: reminder.id,
-    eventCreatorID: reminder.lightweight_event_creator.id,
+    eventCreatorID: reminder.lightweight_event_creator
+      ? reminder.lightweight_event_creator.id
+      : null,
     time: reminder.time,
-    eventType: reminder.lightweight_event_type.toLowerCase(),
+    eventType: reminder.lightweight_event_type
+      ? reminder.lightweight_event_type.toLowerCase()
+      : null,
     locationName: reminder.location_name,
     // @TODO verify this
     locationCoordinates: reminder.location_coordinates,
     locationPage: reminder.location_page,
-    eventStatus: reminder.lightweight_event_status.toLowerCase(),
+    eventStatus: reminder.lightweight_event_status
+      ? reminder.lightweight_event_status.toLowerCase()
+      : null,
     note: reminder.note,
-    repeatMode: reminder.repeat_mode.toLowerCase(),
+    repeatMode: reminder.repeat_mode ? reminder.repeat_mode.toLowerCase() : null,
     eventTitle: reminder.event_title,
     triggerMessage: reminder.trigger_message,
     secondsToNotifyBefore: reminder.seconds_to_notify_before,
     allowsRsvp: reminder.allows_rsvp,
     relatedEvent: reminder.related_event,
-    members: reminder.event_reminder_members.edges.map(function(member) {
+    members: members.map(function(member) {
       return {
-        memberID: member.node.id,
-        state: member.guest_list_state.toLowerCase()
+        memberID: member && member.node ? member.node.id : null,
+        state:
+          member && member.guest_list_state
+            ? member.guest_list_state.toLowerCase()
+            : null
       };
-    })
+    }).filter(Boolean)
   };
 }
 
 function formatThreadGraphQLResponse(data) {
-  try{
-    var messageThread = data.o0.data.message_thread;
-  } catch (err){
-    console.error("GetThreadInfoGraphQL", "Can't get this thread info!");
-    return {err: err};
+  if (!data) {
+    throw { error: "getThreadInfoGraphQL: empty response payload" };
+  }
+
+  var messageThread =
+    data.message_thread ||
+    (data.o0 && data.o0.data ? data.o0.data.message_thread : null);
+
+  if (!messageThread || !messageThread.thread_key) {
+    throw {
+      error: "getThreadInfoGraphQL: invalid thread payload",
+      res: data
+    };
   }
   var threadID = messageThread.thread_key.thread_fbid
     ? messageThread.thread_key.thread_fbid
@@ -62,19 +89,35 @@ function formatThreadGraphQLResponse(data) {
   return {
     threadID: threadID,
     threadName: messageThread.name,
-    participantIDs: messageThread.all_participants.edges.map(d => d.node.messaging_actor.id),
-    userInfo: messageThread.all_participants.edges.map(d => ({
-      id: d.node.messaging_actor.id,
-      name: d.node.messaging_actor.name,
-      firstName: d.node.messaging_actor.short_name,
-      vanity: d.node.messaging_actor.username,
-      thumbSrc: d.node.messaging_actor.big_image_src.uri,
-      profileUrl: d.node.messaging_actor.big_image_src.uri,
-      gender: d.node.messaging_actor.gender,
-      type: d.node.messaging_actor.__typename,
-      isFriend: d.node.messaging_actor.is_viewer_friend,
-      isBirthday: !!d.node.messaging_actor.is_birthday //not sure?
-    })),
+    participantIDs: (messageThread.all_participants && Array.isArray(messageThread.all_participants.edges)
+      ? messageThread.all_participants.edges
+      : [])
+      .map(function(d) {
+        return d && d.node && d.node.messaging_actor
+          ? d.node.messaging_actor.id
+          : null;
+      })
+      .filter(Boolean),
+    userInfo: (messageThread.all_participants && Array.isArray(messageThread.all_participants.edges)
+      ? messageThread.all_participants.edges
+      : [])
+      .map(function(d) {
+        var actor = d && d.node ? d.node.messaging_actor : null;
+        if (!actor) return null;
+        return {
+          id: actor.id,
+          name: actor.name,
+          firstName: actor.short_name,
+          vanity: actor.username,
+          thumbSrc: actor.big_image_src ? actor.big_image_src.uri : null,
+          profileUrl: actor.big_image_src ? actor.big_image_src.uri : null,
+          gender: actor.gender,
+          type: actor.__typename,
+          isFriend: actor.is_viewer_friend,
+          isBirthday: !!actor.is_birthday //not sure?
+        };
+      })
+      .filter(Boolean),
     unreadCount: messageThread.unread_count,
     messageCount: messageThread.messages_count,
     timestamp: messageThread.updated_time_precise,
@@ -85,7 +128,7 @@ function formatThreadGraphQLResponse(data) {
     folder: messageThread.folder,
     cannotReplyReason: messageThread.cannot_reply_reason,
     eventReminders: messageThread.event_reminders
-      ? messageThread.event_reminders.nodes.map(formatEventReminders)
+      ? messageThread.event_reminders.nodes.map(formatEventReminders).filter(Boolean)
       : null,
     emoji: messageThread.customization_info
       ? messageThread.customization_info.emoji
@@ -106,18 +149,27 @@ function formatThreadGraphQLResponse(data) {
             {}
           )
         : {},
-    adminIDs: messageThread.thread_admins,
+    adminIDs: Array.isArray(messageThread.thread_admins) ? messageThread.thread_admins : [],
     approvalMode: Boolean(messageThread.approval_mode),
-    approvalQueue: messageThread.group_approval_queue.nodes.map(a => ({
-      inviterID: a.inviter.id,
-      requesterID: a.requester.id,
-      timestamp: a.request_timestamp,
-      request_source: a.request_source // @Undocumented
-    })),
+    approvalQueue:
+      messageThread.group_approval_queue && Array.isArray(messageThread.group_approval_queue.nodes)
+        ? messageThread.group_approval_queue.nodes.map(function(a) {
+            return {
+              inviterID: a && a.inviter ? a.inviter.id : null,
+              requesterID: a && a.requester ? a.requester.id : null,
+              timestamp: a ? a.request_timestamp : null,
+              request_source: a ? a.request_source : null // @Undocumented
+            };
+          })
+        : [],
 
     // @Undocumented
-    reactionsMuteMode: messageThread.reactions_mute_mode.toLowerCase(),
-    mentionsMuteMode: messageThread.mentions_mute_mode.toLowerCase(),
+    reactionsMuteMode: messageThread.reactions_mute_mode
+      ? messageThread.reactions_mute_mode.toLowerCase()
+      : null,
+    mentionsMuteMode: messageThread.mentions_mute_mode
+      ? messageThread.mentions_mute_mode.toLowerCase()
+      : null,
     isPinProtected: messageThread.is_pin_protected,
     relatedPageThread: messageThread.related_page_thread,
 
@@ -184,6 +236,13 @@ module.exports = function(defaultFuncs, api, ctx) {
       .post("https://www.facebook.com/api/graphqlbatch/", ctx.jar, form)
       .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
       .then(function(resData) {
+        if (!Array.isArray(resData) || resData.length === 0) {
+          throw {
+            error: "getThreadInfoGraphQL: invalid graphql response",
+            res: resData
+          };
+        }
+
         if (resData.error) {
           throw resData;
         }
