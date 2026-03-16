@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/fca-unofficial/fca-unofficial.git"
+    "url": "https://github.com/VangBanLaNhat/fca-unofficial"
   },
   "keywords": [
     "facebook",
@@ -21,9 +21,9 @@
     "fca"
   ],
   "bugs": {
-    "url": "https://github.com/fca-unofficial/fca-unofficial/issues"
+    "url": "https://github.com/VangBanLaNhat/fca-unofficial/issues"
   },
-  "author": "Avery, David, Maude, Benjamin, UIRI",
+  "author": "Avery, David, Maude, Benjamin, UIRI, HerokeyVN",
   "license": "MIT",
   "dependencies": {
     "bluebird": "^2.11.0",

@@ -1,8 +1,6 @@
-This repo will no longer be updated because it is too old, you can switch to the [ws3-fca](https://github.com/VangBanLaNhat/ws3-fca) project
-
 # Unofficial Facebook Chat API
 <a href="https://www.npmjs.com/package/fca-unofficial"><img alt="npm version" src="https://img.shields.io/npm/v/fca-unofficial.svg?style=flat-square"></a>
-<img alt="version" src="https://img.shields.io/github/package-json/v/fca-unofficial/fca-unofficial?label=github&style=flat-square">
+<img alt="version" src="https://img.shields.io/github/package-json/v/VangBanLaNhat/fca-unofficial?label=github&style=flat-square">
 <a href="https://www.npmjs.com/package/fca-unofficial"><img src="https://img.shields.io/npm/dm/fca-unofficial.svg?style=flat-square" alt="npm downloads"></a>
 [![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg?style=flat-square)](https://github.com/prettier/prettier)
 
@@ -26,7 +24,7 @@ It will download `fca-unofficial` from NPM repositories
 ### Bleeding edge
 If you want to use bleeding edge (directly from github) to test new features or submit bug report, this is the command for you:
 ```bash
-npm install fca-unofficial/fca-unofficial
+npm install VangBanLaNhat/fca-unofficial
 ```
 
 ## Testing your bots
