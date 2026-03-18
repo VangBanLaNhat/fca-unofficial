@@ -6,7 +6,10 @@ module.exports = function(defaultFuncs, api, ctx) {
   return function addExternalModule(moduleObj) {
     if (utils.getType(moduleObj) == "Object") {
         for (let apiName in moduleObj) {
-            if (utils.getType(moduleObj[apiName]) == "Function") {
+            if (
+              utils.getType(moduleObj[apiName]) == "Function" ||
+              utils.getType(moduleObj[apiName]) == "AsyncFunction"
+            ) {
                 api[apiName] = moduleObj[apiName](defaultFuncs, api, ctx);
             } else {
                 throw new Error(`Item "${apiName}" in moduleObj must be a function, not ${utils.getType(moduleObj[apiName])}!`);

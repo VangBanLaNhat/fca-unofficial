@@ -16,16 +16,30 @@ module.exports = function(defaultFuncs, api, ctx) {
       ) {
         callback = type;
         type = "inbox"; //default to inbox
+      } else if (utils.getType(type) === "Undefined") {
+        type = "inbox";
       } else if (utils.getType(type) !== "String") {
         throw {
           error:
             "Please pass a String as a third argument. Your options are: inbox, pending, and archived"
         };
-      } else {
-        throw {
-          error: "getThreadList: need callback"
-        };
       }
+    }
+
+    var resolveFunc = function(){};
+    var rejectFunc = function(){};
+    var returnPromise = new Promise(function (resolve, reject) {
+      resolveFunc = resolve;
+      rejectFunc = reject;
+    });
+
+    if (utils.getType(callback) !== "Function" && utils.getType(callback) !== "AsyncFunction") {
+      callback = function (err, data) {
+        if (err) {
+          return rejectFunc(err);
+        }
+        resolveFunc(data);
+      };
     }
 
     if (type === "archived") {
@@ -71,5 +85,7 @@ module.exports = function(defaultFuncs, api, ctx) {
         log.error("getThreadList", err);
         return callback(err);
       });
+
+    return returnPromise;
   };
 };

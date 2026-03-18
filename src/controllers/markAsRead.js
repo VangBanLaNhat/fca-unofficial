@@ -41,8 +41,12 @@ module.exports = function (defaultFuncs, api, ctx) {
             .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
         );
       } catch (e) {
-        callback(e);
-        return e;
+        try {
+          await callback(e);
+        } catch (_) {
+          // callback failure should not hide the request failure
+        }
+        throw e;
       }
 
       if (resData.error) {
@@ -51,11 +55,15 @@ module.exports = function (defaultFuncs, api, ctx) {
         if (utils.getType(err) == "Object" && err.error === "Not logged in.") {
           ctx.loggedIn = false;
         }
-        callback(err);
-        return err;
+        try {
+          await callback(err);
+        } catch (_) {
+          // callback failure should not hide the request failure
+        }
+        throw err;
       }
 
-      callback();
+      await callback();
       return null;
     } else {
       try {
@@ -72,8 +80,12 @@ module.exports = function (defaultFuncs, api, ctx) {
           };
         }
       } catch (e) {
-        callback(e);
-        return e;
+        try {
+          await callback(e);
+        } catch (_) {
+          // callback failure should not hide the request failure
+        }
+        throw e;
       }
     }
   };

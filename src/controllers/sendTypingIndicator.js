@@ -68,36 +68,97 @@ module.exports = function (defaultFuncs, api, ctx) {
   }
 
   return function sendTypingIndicator(threadID, callback, isGroup) {
-    if (
-      utils.getType(callback) !== "Function" &&
-      utils.getType(callback) !== "AsyncFunction"
-    ) {
-      if (callback) {
+    var callbackType = utils.getType(callback);
+    var userCallback =
+      callbackType === "Function" || callbackType === "AsyncFunction"
+        ? callback
+        : null;
+
+    if (!userCallback && callback) {
+      log.warn(
+        "sendTypingIndicator",
+        "callback is not a function - ignoring."
+      );
+    }
+
+    var startResolve = function () {};
+    var startReject = function () {};
+    var startPromise = new Promise(function (resolve, reject) {
+      startResolve = resolve;
+      startReject = reject;
+    });
+
+    function settleStart(err, data, endFn) {
+      if (userCallback) {
+        try {
+          var cbResult = userCallback(err, data);
+          if (cbResult && typeof cbResult.then === "function") {
+            cbResult.catch(function (cbErr) {
+              log.error("sendTypingIndicator", cbErr);
+            });
+          }
+        } catch (cbErr) {
+          log.error("sendTypingIndicator", cbErr);
+        }
+      }
+
+      if (err) {
+        return startReject(err);
+      }
+      startResolve(endFn);
+    }
+
+    var end = function end(cb) {
+      var cbType = utils.getType(cb);
+      var userEndCallback =
+        cbType === "Function" || cbType === "AsyncFunction" ? cb : null;
+
+      if (!userEndCallback && cb) {
         log.warn(
           "sendTypingIndicator",
           "callback is not a function - ignoring."
         );
       }
-      callback = () => { };
-    }
 
-    makeTypingIndicator(true, threadID, callback, isGroup);
+      var stopResolve = function () {};
+      var stopReject = function () {};
+      var stopPromise = new Promise(function (resolve, reject) {
+        stopResolve = resolve;
+        stopReject = reject;
+      });
 
-    return function end(cb) {
-      if (
-        utils.getType(cb) !== "Function" &&
-        utils.getType(cb) !== "AsyncFunction"
-      ) {
-        if (cb) {
-          log.warn(
-            "sendTypingIndicator",
-            "callback is not a function - ignoring."
-          );
+      makeTypingIndicator(false, threadID, function (err, data) {
+        if (userEndCallback) {
+          try {
+            var endCbResult = userEndCallback(err, data);
+            if (endCbResult && typeof endCbResult.then === "function") {
+              endCbResult.catch(function (cbErr) {
+                log.error("sendTypingIndicator", cbErr);
+              });
+            }
+          } catch (cbErr) {
+            log.error("sendTypingIndicator", cbErr);
+          }
         }
-        cb = () => { };
-      }
 
-      makeTypingIndicator(false, threadID, cb, isGroup);
+        if (err) {
+          return stopReject(err);
+        }
+        stopResolve(data);
+      }, isGroup);
+
+      return stopPromise;
     };
+
+    // Preserve old API (end function) while also making the value awaitable.
+    end.then = startPromise.then.bind(startPromise);
+    end.catch = startPromise.catch.bind(startPromise);
+    end.finally = startPromise.finally.bind(startPromise);
+
+    makeTypingIndicator(true, threadID, function (err, data) {
+      settleStart(err, data, end);
+    }, isGroup);
+
+    return end;
   };
 };
