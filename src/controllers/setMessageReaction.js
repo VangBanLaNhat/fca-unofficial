@@ -2,6 +2,7 @@
 
 var utils = require("../utils");
 var log = require("npmlog");
+var e2eeThread = require("../e2ee/thread");
 
 module.exports = function(defaultFuncs, api, ctx) {
   return function setMessageReaction(reaction, messageID, callback, forceCustomReaction) {
@@ -11,6 +12,22 @@ module.exports = function(defaultFuncs, api, ctx) {
       resolveFunc = resolve;
       rejectFunc = reject;
     });
+
+    var e2eeMeta = null;
+    if (utils.getType(messageID) === "Object") {
+      e2eeMeta = messageID;
+      messageID = messageID.messageID || messageID.messageId || messageID.id;
+    }
+
+    if (utils.getType(callback) === "Object") {
+      e2eeMeta = Object.assign({}, e2eeMeta || {}, callback);
+      callback = null;
+    }
+
+    if (utils.getType(forceCustomReaction) === "Object") {
+      e2eeMeta = Object.assign({}, e2eeMeta || {}, forceCustomReaction);
+      forceCustomReaction = !!forceCustomReaction.forceCustomReaction;
+    }
 
     if (!callback) {
       callback = function (err, friendList) {
@@ -72,6 +89,14 @@ module.exports = function(defaultFuncs, api, ctx) {
           break; 
         }
         return callback({ error: "Reaction is not a valid emoji." });
+    }
+
+    if (e2eeMeta && e2eeThread.isE2EEChatJid(e2eeMeta.chatJid)) {
+      if (!e2eeMeta.senderJid) {
+        return callback({ error: "E2EE reaction requires senderJid in message descriptor." });
+      }
+      api.sendReactionE2EE(e2eeMeta.chatJid, messageID, e2eeMeta.senderJid, reaction, callback);
+      return returnPromise;
     }
 
     var variables = {

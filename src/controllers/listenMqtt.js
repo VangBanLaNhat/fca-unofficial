@@ -6,6 +6,7 @@ var mqtt = require('mqtt');
 var websocket = require('websocket-stream');
 var HttpsProxyAgent = require('https-proxy-agent');
 const EventEmitter = require('events');
+var e2eeBridge = require("../e2ee/bridge");
 var identity = function () { };
 var form = {};
 var getSeqID = function () { };
@@ -622,6 +623,32 @@ function markDelivery(ctx, api, threadID, messageID) {
 	}
 }
 
+function startE2EEBridgeIfEnabled(ctx, globalCallback) {
+	if (ctx.globalOptions.enableE2EE === false) {
+		return;
+	}
+
+	e2eeBridge
+		.createBridge(ctx)
+		.connect(globalCallback)
+		.catch(function (err) {
+			log.error("listenMqtt:e2ee", err);
+			if (typeof globalCallback === "function") {
+				globalCallback(err);
+			}
+		});
+}
+
+function stopE2EEBridge(ctx) {
+	if (!ctx._e2eeBridge) {
+		return Promise.resolve();
+	}
+
+	return ctx._e2eeBridge.disconnect().catch(function (err) {
+		log.error("listenMqtt:e2ee", err);
+	});
+}
+
 module.exports = function (defaultFuncs, api, ctx) {
 	var globalCallback = identity;
 	getSeqID = function getSeqID() {
@@ -653,6 +680,7 @@ module.exports = function (defaultFuncs, api, ctx) {
 				callback = callback || (() => { });
 				globalCallback = identity;
 				ctx._stopListening = true;
+				stopE2EEBridge(ctx);
 				if (ctx.mqttClient) {
 					ctx.mqttClient.unsubscribe("/webrtc");
 					ctx.mqttClient.unsubscribe("/rtc_multi");
@@ -696,6 +724,7 @@ module.exports = function (defaultFuncs, api, ctx) {
 
 		if (!ctx.firstListen || !ctx.lastSeqId) getSeqID();
 		else listenMqtt(defaultFuncs, api, ctx, globalCallback);
+		startE2EEBridgeIfEnabled(ctx, globalCallback);
 		ctx.firstListen = false;
 		return msgEmitter;
 	};

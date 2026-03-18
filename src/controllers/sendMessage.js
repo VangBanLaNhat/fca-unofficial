@@ -3,6 +3,7 @@
 var utils = require("../utils");
 var log = require("npmlog");
 var bluebird = require("bluebird");
+var e2eeThread = require("../e2ee/thread");
 
 var allowedProperties = {
   attachment: true,
@@ -368,6 +369,42 @@ module.exports = function (defaultFuncs, api, ctx) {
     var msgType = utils.getType(msg);
     var threadIDType = utils.getType(threadID);
     var messageIDType = utils.getType(replyToMessage);
+
+    // Auto E2EE mode: if threadID is chat JID, route to E2EE sender.
+    if (e2eeThread.isE2EEChatJid(threadID)) {
+      if (msgType !== "String" && msgType !== "Object") {
+        return callback({
+          error:
+            "Message should be of type string or object and not " + msgType + "."
+        });
+      }
+
+      if (msgType === "String") {
+        msg = { body: msg };
+      }
+
+      if (msg.attachment || msg.url || msg.sticker || msg.emoji || msg.location || msg.mentions) {
+        return callback({
+          error:
+            "Auto E2EE in sendMessage currently supports text/reply only. Use sendMediaE2EE for media/attachments."
+        });
+      }
+
+      var textBody = msg.body != null ? String(msg.body) : "";
+      if (!textBody) {
+        return callback({ error: "E2EE message body is empty." });
+      }
+
+      return api.sendMessageE2EE(
+        threadID,
+        {
+          text: textBody,
+          replyToId: replyToMessage || msg.replyToId,
+          replyToSenderJid: msg.replyToSenderJid
+        },
+        callback
+      );
+    }
 
     if (msgType !== "String" && msgType !== "Object") {
       return callback({

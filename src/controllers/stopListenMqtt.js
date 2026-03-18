@@ -1,6 +1,7 @@
 "use strict";
 
 var log = require("npmlog");
+var e2eeBridge = require("../e2ee/bridge");
 
 module.exports = function (_defaultFuncs, _api, ctx) {
   return function stopListenMqtt(callback) {
@@ -35,7 +36,15 @@ module.exports = function (_defaultFuncs, _api, ctx) {
     }
 
     if (!ctx.mqttClient) {
-      settle(new Error("Not connected to MQTT"));
+      e2eeBridge
+        .createBridge(ctx)
+        .disconnect()
+        .then(function () {
+          settle(new Error("Not connected to MQTT"));
+        })
+        .catch(function () {
+          settle(new Error("Not connected to MQTT"));
+        });
       return returnPromise;
     }
 
@@ -54,7 +63,15 @@ module.exports = function (_defaultFuncs, _api, ctx) {
     ctx.mqttClient.end(false, function () {
       log.info("stopListenMqtt", "Stopped");
       ctx.mqttClient = null;
-      settle(null, true);
+      e2eeBridge
+        .createBridge(ctx)
+        .disconnect()
+        .then(function () {
+          settle(null, true);
+        })
+        .catch(function (err) {
+          settle(err);
+        });
     });
 
     return returnPromise;

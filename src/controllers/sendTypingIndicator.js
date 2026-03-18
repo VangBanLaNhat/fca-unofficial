@@ -2,6 +2,7 @@
 
 var utils = require("../utils");
 var log = require("npmlog");
+var e2eeThread = require("../e2ee/thread");
 
 module.exports = function (defaultFuncs, api, ctx) {
   function makeTypingIndicator(typ, threadID, callback, isGroup) {
@@ -108,52 +109,71 @@ module.exports = function (defaultFuncs, api, ctx) {
       startResolve(endFn);
     }
 
-    var end = function end(cb) {
-      var cbType = utils.getType(cb);
-      var userEndCallback =
-        cbType === "Function" || cbType === "AsyncFunction" ? cb : null;
+    function makeEnd(stopFn) {
+      var end = function end(cb) {
+        var cbType = utils.getType(cb);
+        var userEndCallback =
+          cbType === "Function" || cbType === "AsyncFunction" ? cb : null;
 
-      if (!userEndCallback && cb) {
-        log.warn(
-          "sendTypingIndicator",
-          "callback is not a function - ignoring."
-        );
-      }
+        if (!userEndCallback && cb) {
+          log.warn(
+            "sendTypingIndicator",
+            "callback is not a function - ignoring."
+          );
+        }
 
-      var stopResolve = function () {};
-      var stopReject = function () {};
-      var stopPromise = new Promise(function (resolve, reject) {
-        stopResolve = resolve;
-        stopReject = reject;
+        var stopResolve = function () {};
+        var stopReject = function () {};
+        var stopPromise = new Promise(function (resolve, reject) {
+          stopResolve = resolve;
+          stopReject = reject;
+        });
+
+        stopFn(function (err, data) {
+          if (userEndCallback) {
+            try {
+              var endCbResult = userEndCallback(err, data);
+              if (endCbResult && typeof endCbResult.then === "function") {
+                endCbResult.catch(function (cbErr) {
+                  log.error("sendTypingIndicator", cbErr);
+                });
+              }
+            } catch (cbErr) {
+              log.error("sendTypingIndicator", cbErr);
+            }
+          }
+
+          if (err) {
+            return stopReject(err);
+          }
+          stopResolve(data);
+        });
+
+        return stopPromise;
+      };
+
+      end.then = startPromise.then.bind(startPromise);
+      end.catch = startPromise.catch.bind(startPromise);
+      end.finally = startPromise.finally.bind(startPromise);
+
+      return end;
+    }
+
+    if (e2eeThread.isE2EEChatJid(threadID)) {
+      var e2eeEnd = makeEnd(function (done) {
+        api.sendTypingE2EE(threadID, false, done);
       });
 
-      makeTypingIndicator(false, threadID, function (err, data) {
-        if (userEndCallback) {
-          try {
-            var endCbResult = userEndCallback(err, data);
-            if (endCbResult && typeof endCbResult.then === "function") {
-              endCbResult.catch(function (cbErr) {
-                log.error("sendTypingIndicator", cbErr);
-              });
-            }
-          } catch (cbErr) {
-            log.error("sendTypingIndicator", cbErr);
-          }
-        }
+      api.sendTypingE2EE(threadID, true, function (err, data) {
+        settleStart(err, data, e2eeEnd);
+      });
 
-        if (err) {
-          return stopReject(err);
-        }
-        stopResolve(data);
-      }, isGroup);
+      return e2eeEnd;
+    }
 
-      return stopPromise;
-    };
-
-    // Preserve old API (end function) while also making the value awaitable.
-    end.then = startPromise.then.bind(startPromise);
-    end.catch = startPromise.catch.bind(startPromise);
-    end.finally = startPromise.finally.bind(startPromise);
+    var end = makeEnd(function (done) {
+      makeTypingIndicator(false, threadID, done, isGroup);
+    });
 
     makeTypingIndicator(true, threadID, function (err, data) {
       settleStart(err, data, end);
