@@ -202,19 +202,57 @@ module.exports = function (defaultFuncs, api, ctx) {
   }
 
   return function sendMessageMqtt(msg, threadID, callback, replyToMessage) {
+    var originalCallback = callback;
+
+    var resolveFunc = function () {};
+    var rejectFunc = function () {};
+    var returnPromise = new Promise(function (resolve, reject) {
+      resolveFunc = resolve;
+      rejectFunc = reject;
+    });
+
+    var callbackType = utils.getType(callback);
+    var userCallback = (callbackType === "Function" || callbackType === "AsyncFunction")
+      ? callback
+      : null;
+
+    callback = function (err, data) {
+      if (userCallback) {
+        try {
+          var cbResult = userCallback(err, data);
+          if (cbResult && typeof cbResult.then === "function") {
+            cbResult.catch(function (cbErr) {
+              log.error("sendMessageMqtt", cbErr);
+            });
+          }
+        } catch (cbErr) {
+          log.error("sendMessageMqtt", cbErr);
+        }
+      }
+
+      if (err) {
+        return rejectFunc(err);
+      }
+      resolveFunc(data);
+    };
+
     if (
-      !callback &&
+      !userCallback &&
       (utils.getType(threadID) === "Function" || utils.getType(threadID) === "AsyncFunction")
     ) {
-      return threadID({ error: "Pass a threadID as a second argument." });
+      var argErr = { error: "Pass a threadID as a second argument." };
+      try {
+        threadID(argErr);
+      } catch (cbErr) {
+        log.error("sendMessageMqtt", cbErr);
+      }
+      rejectFunc(argErr);
+      return returnPromise;
     }
 
-    if (!replyToMessage && utils.getType(callback) === "String") {
-      replyToMessage = callback;
-      callback = function () {};
+    if (!replyToMessage && utils.getType(originalCallback) === "String") {
+      replyToMessage = originalCallback;
     }
-
-    if (!callback) callback = function () {};
 
     var msgType = utils.getType(msg);
     if (msgType !== "String" && msgType !== "Object") {
@@ -282,5 +320,7 @@ module.exports = function (defaultFuncs, api, ctx) {
         });
       });
     });
+
+    return returnPromise;
   };
 };
