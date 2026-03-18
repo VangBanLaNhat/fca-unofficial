@@ -164,6 +164,52 @@ login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, ap
 });
 ```
 
+------------------------------------
+
+### E2EE Support (meta-messenger bridge)
+
+`fca-unofficial` supports receiving and sending E2EE messages by bridging to `meta-messenger.js`.
+
+Enable E2EE at login:
+
+```js
+login({ appState }, {
+    enableE2EE: true,
+    e2eeMemoryOnly: false,
+    e2eeDevicePath: "./e2ee_device.json"
+}, (err, api) => {
+    if (err) return console.error(err);
+
+    api.listenMqtt((listenErr, event) => {
+        if (listenErr) return console.error(listenErr);
+
+        if (event.type === "e2ee_message") {
+            console.log("[E2EE]", event.body, event.e2ee.chatJid);
+        }
+    });
+});
+```
+
+Added E2EE APIs:
+
+- `api.connectE2EE(callback)`
+- `api.disconnectE2EE(callback)`
+- `api.getE2EEDeviceData(callback)`
+- `api.sendMessageE2EE(chatJid, message, callback)`
+- `api.sendMediaE2EE(chatJid, mediaType, data, options, callback)`
+- `api.sendReactionE2EE(chatJid, messageID, senderJid, reaction, callback)`
+- `api.sendTypingE2EE(chatJid, isTyping, callback)`
+- `api.unsendMessageE2EE(chatJid, messageID, callback)`
+- `api.downloadE2EEMedia(options, callback)`
+
+Auto routing behavior:
+
+- `api.sendMessage(...)` auto-selects normal or E2EE by `threadID` format.
+- `api.sendTypingIndicator(...)`, `api.unsendMessage(...)`, and `api.setMessageReaction(...)` also support auto routing when E2EE metadata is provided.
+- E2EE-specific APIs (`sendMessageE2EE`, `sendMediaE2EE`, `sendReactionE2EE`, `sendTypingE2EE`, `unsendMessageE2EE`) auto-fallback to normal transport when target is not an E2EE chat JID.
+- For non-E2EE threads, MQTT is now the default transport when MQTT client is connected (`listenMqtt` active).
+- Dedicated files `sendMessageMqtt.js` and `setMessageReactionMqtt.js` were removed; legacy method names are still aliased for backward compatibility.
+
 ## FAQS
 
 1. How do I run tests?

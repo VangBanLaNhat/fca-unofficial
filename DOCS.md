@@ -44,12 +44,17 @@
 * [`api.removeUserFromGroup`](#removeUserFromGroup)
 * [`api.resolvePhotoUrl`](#resolvePhotoUrl)
 * [`api.searchForThread`](#searchForThread)
+* [`api.sendMessageE2EE`](#sendMessageE2EE)
+* [`api.sendMediaE2EE`](#sendMediaE2EE)
 * [`api.sendMessage`](#sendMessage)
+* [`api.sendReactionE2EE`](#sendReactionE2EE)
+* [`api.sendTypingE2EE`](#sendTypingE2EE)
 * [`api.sendTypingIndicator`](#sendTypingIndicator)
 * [`api.setMessageReaction`](#setMessageReaction)
 * [`api.setOptions`](#setOptions)
 * [`api.setTitle`](#setTitle)
 * [`api.threadColors`](#threadColors)
+* [`api.unsendMessageE2EE`](#unsendMessageE2EE)
 * [`api.unsendMessage`](#unsendMessage)
 
 ---------------------------------------
@@ -1689,6 +1694,20 @@ __Arguments__
 * `callback(err, messageInfo)`: (Optional) A callback called when sending the message is done (either with an error or with an confirmation object). `messageInfo` contains the `threadID` where the message was sent and a `messageID`, as well as the `timestamp` of the message.
 * `messageID`: (Optional) A string representing a message you want to reply.
 
+__Auto mode__
+
+`api.sendMessage` now auto-selects the transport:
+
+* E2EE send when `threadID` is a chat JID (`*@user.facebook.com` or `*@group.facebook.com`).
+* MQTT send when MQTT client is connected (`listenMqtt` is active), message type is MQTT-compatible, and target is not E2EE.
+* HTTP send as fallback for cases not covered by MQTT path.
+
+For E2EE `threadID` in auto mode, `sendMessage` currently supports text/reply only. Use `api.sendMediaE2EE` for media.
+
+Legacy alias:
+
+* `api.sendMessageMqtt` is kept as an alias to `api.sendMessage`.
+
 __Message Object__:
 
 Various types of message can be sent:
@@ -1787,6 +1806,10 @@ __Arguments__
 * `threadID`: Group chat ID.
 * `callback(err)`: A callback called when the query is done (with an error or with null).
 
+__Auto mode__
+
+`api.sendTypingIndicator` auto-selects normal typing or E2EE typing based on `threadID` format (same rule as `api.sendMessage`).
+
 ---------------------------------------
 
 <a name="setMessageReaction"></a>
@@ -1800,6 +1823,26 @@ __Arguments__
 * `messageID`: A string representing the message ID.
 * `callback(err)`: A callback called when sending the reaction is done.
 * `forceCustomReaction`: Forcing the use of an emoji for setting reaction **(WARNING: NOT TESTED, YOU SHOULD NOT USE THIS AT ALL, UNLESS YOU'RE TESTING A NEW EMOJI)**
+
+__Auto E2EE mode__
+
+You can pass an E2EE message descriptor instead of plain `messageID`:
+
+* `api.setMessageReaction(reaction, { messageID, chatJid, senderJid }, callback)`
+
+When `chatJid` is an E2EE chat JID, the API routes to E2EE reaction automatically.
+
+For non-E2EE messages, MQTT reaction is used by default when MQTT client is connected and `threadID` is provided.
+
+Recommended non-E2EE descriptor format:
+
+* `api.setMessageReaction(reaction, { messageID, threadID }, callback)`
+
+If `threadID` is not provided, the API falls back to HTTP reaction.
+
+Legacy alias:
+
+* `api.setMessageReactionMqtt` is kept as an alias to `api.setMessageReaction`.
 
 __Supported Emojis__
 
@@ -1841,6 +1884,12 @@ __Arguments__
 	- `autoMarkRead`: (Default `false`) Will automatically mark new messages as read/seen. See [api.markAsRead](#markAsRead).
 	- `proxy`: (Default empty) Set this to proxy server address to use proxy. Note: Only HTTP Proxies which support CONNECT method is supported.
 	- `online`: (Default `true`) Set account's online state.
+	- `autoReconnect`: (Default `true`) Reconnect MQTT/E2EE listeners automatically on disconnect.
+	- `emitReady`: (Default `false`) Emit ready event in listen loop startup.
+	- `enableE2EE`: (Default `false`) Enable E2EE bridge integration.
+	- `e2eeMemoryOnly`: (Default `true`) Keep E2EE device/session data in memory only.
+	- `e2eeDevicePath`: (Default empty) Path to persist E2EE device data.
+	- `e2eeDeviceData`: (Default empty) Preloaded E2EE device data JSON string.
 
 __Example__
 
@@ -1897,5 +1946,59 @@ __Arguments__
 
 * `messageID`: Message ID you want to unsend.
 * `callback(err)`: A callback called when the query is done (with an error or with null).
+
+__Auto E2EE mode__
+
+You can pass E2EE context to auto-route unsend:
+
+* `api.unsendMessage({ messageID, chatJid }, callback)`
+* `api.unsendMessage(messageID, callback, chatJid)`
+
+When `chatJid` is an E2EE chat JID, the API routes to E2EE unsend automatically.
+
+---------------------------------------
+
+<a name="sendMessageE2EE"></a>
+### api.sendMessageE2EE(chatJid, message[, callback])
+
+Sends a text message through E2EE transport.
+
+This method also supports auto fallback to normal `api.sendMessage` if `chatJid` is not an E2EE chat JID.
+
+---------------------------------------
+
+<a name="sendMediaE2EE"></a>
+### api.sendMediaE2EE(chatJid, mediaType, data[, options][, callback])
+
+Sends media through E2EE transport.
+
+This method also supports auto fallback to normal send with attachment when `chatJid` is not an E2EE chat JID.
+
+---------------------------------------
+
+<a name="sendReactionE2EE"></a>
+### api.sendReactionE2EE(chatJid, messageID, senderJid, reaction[, callback])
+
+Sets/removes reaction through E2EE transport.
+
+This method also supports auto fallback to normal `api.setMessageReaction` when `chatJid` is not an E2EE chat JID.
+
+---------------------------------------
+
+<a name="sendTypingE2EE"></a>
+### api.sendTypingE2EE(chatJid, isTyping[, callback])
+
+Sends typing indicator through E2EE transport.
+
+This method also supports auto fallback to normal `api.sendTypingIndicator` when `chatJid` is not an E2EE chat JID.
+
+---------------------------------------
+
+<a name="unsendMessageE2EE"></a>
+### api.unsendMessageE2EE(chatJid, messageID[, callback])
+
+Unsend message through E2EE transport.
+
+This method also supports auto fallback to normal `api.unsendMessage` when `chatJid` is not an E2EE chat JID.
 
 ---------------------------------------

@@ -109,6 +109,18 @@ function setOptions(globalOptions, options) {
       case 'emitReady':
         globalOptions.emitReady = Boolean(options.emitReady);
         break;
+      case 'enableE2EE':
+        globalOptions.enableE2EE = Boolean(options.enableE2EE);
+        break;
+      case 'e2eeMemoryOnly':
+        globalOptions.e2eeMemoryOnly = Boolean(options.e2eeMemoryOnly);
+        break;
+      case 'e2eeDevicePath':
+        globalOptions.e2eeDevicePath = options.e2eeDevicePath;
+        break;
+      case 'e2eeDeviceData':
+        globalOptions.e2eeDeviceData = options.e2eeDeviceData;
+        break;
       default:
         log.warn("setOptions", "Unrecognized option given to setOptions: " + key);
         break;
@@ -212,7 +224,9 @@ function buildAPI(globalOptions, html, jar) {
     wsReqNumber: 0,
     wsTaskNumber: 0,
     fb_dtsg: initialFbDtsg,
-    ttstamp: initialTtstamp
+    ttstamp: initialTtstamp,
+    _e2eeBridge: null,
+    _e2eeDeviceData: globalOptions.e2eeDeviceData || null
   };
 
   var api = {
@@ -238,6 +252,8 @@ function buildAPI(globalOptions, html, jar) {
   //Removing original `listen` that uses pull.
   //Map it to listenMqtt instead for backward compatibly.
   api.listen = api.listenMqtt;
+  api.sendMessageMqtt = api.sendMessage;
+  api.setMessageReactionMqtt = api.setMessageReaction;
 
   // Keep fb_dtsg/jazoest fresh to reduce long-session send failures.
   if (ctx.refreshDtsgTimer) {
@@ -613,6 +629,10 @@ function login(loginData, options, callback) {
     autoMarkDelivery: true,
     autoMarkRead: false,
     autoReconnect: true,
+    enableE2EE: false,
+    e2eeMemoryOnly: true,
+    e2eeDevicePath: undefined,
+    e2eeDeviceData: undefined,
     logRecordSize: defaultLogRecordSize,
     online: true,
     emitReady: false,
