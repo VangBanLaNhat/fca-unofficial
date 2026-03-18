@@ -252,6 +252,8 @@ function buildAPI(globalOptions, html, jar) {
   //Removing original `listen` that uses pull.
   //Map it to listenMqtt instead for backward compatibly.
   api.listen = api.listenMqtt;
+  api.sendMessageMqtt = api.sendMessage;
+  api.setMessageReactionMqtt = api.setMessageReaction;
 
   // Keep fb_dtsg/jazoest fresh to reduce long-session send failures.
   if (ctx.refreshDtsgTimer) {

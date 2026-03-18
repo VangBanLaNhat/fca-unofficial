@@ -207,6 +207,8 @@ Auto routing behavior:
 - `api.sendMessage(...)` auto-selects normal or E2EE by `threadID` format.
 - `api.sendTypingIndicator(...)`, `api.unsendMessage(...)`, and `api.setMessageReaction(...)` also support auto routing when E2EE metadata is provided.
 - E2EE-specific APIs (`sendMessageE2EE`, `sendMediaE2EE`, `sendReactionE2EE`, `sendTypingE2EE`, `unsendMessageE2EE`) auto-fallback to normal transport when target is not an E2EE chat JID.
+- For non-E2EE threads, MQTT is now the default transport when MQTT client is connected (`listenMqtt` active).
+- Dedicated files `sendMessageMqtt.js` and `setMessageReactionMqtt.js` were removed; legacy method names are still aliased for backward compatibility.
 
 ## FAQS
 

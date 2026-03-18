@@ -1698,10 +1698,15 @@ __Auto mode__
 
 `api.sendMessage` now auto-selects the transport:
 
-* Normal Messenger send when `threadID` is a numeric/string thread id.
 * E2EE send when `threadID` is a chat JID (`*@user.facebook.com` or `*@group.facebook.com`).
+* MQTT send when MQTT client is connected (`listenMqtt` is active), message type is MQTT-compatible, and target is not E2EE.
+* HTTP send as fallback for cases not covered by MQTT path.
 
 For E2EE `threadID` in auto mode, `sendMessage` currently supports text/reply only. Use `api.sendMediaE2EE` for media.
+
+Legacy alias:
+
+* `api.sendMessageMqtt` is kept as an alias to `api.sendMessage`.
 
 __Message Object__:
 
@@ -1826,6 +1831,18 @@ You can pass an E2EE message descriptor instead of plain `messageID`:
 * `api.setMessageReaction(reaction, { messageID, chatJid, senderJid }, callback)`
 
 When `chatJid` is an E2EE chat JID, the API routes to E2EE reaction automatically.
+
+For non-E2EE messages, MQTT reaction is used by default when MQTT client is connected and `threadID` is provided.
+
+Recommended non-E2EE descriptor format:
+
+* `api.setMessageReaction(reaction, { messageID, threadID }, callback)`
+
+If `threadID` is not provided, the API falls back to HTTP reaction.
+
+Legacy alias:
+
+* `api.setMessageReactionMqtt` is kept as an alias to `api.setMessageReaction`.
 
 __Supported Emojis__
 
