@@ -293,6 +293,7 @@ describe("E2EE controllers", function () {
 
     expect(thread.isE2EEChatJid("123@user.facebook.com")).toBe(true);
     expect(thread.isE2EEChatJid("456@group.facebook.com")).toBe(true);
+    expect(thread.isE2EEChatJid("1805602490133470@g.us")).toBe(true);
     expect(thread.isE2EEChatJid("123456789")).toBe(false);
   });
 });

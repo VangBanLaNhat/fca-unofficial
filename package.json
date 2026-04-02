@@ -7,6 +7,10 @@
     "test": "jest --runInBand --testPathIgnorePatterns=\"/test/integration/\"",
     "test:unit": "jest --runInBand",
     "test:integration": "jest --runInBand --testPathPattern=\"test/integration\"",
+    "discover:e2ee-jid": "node scripts/discover-e2ee-jid.js",
+    "listen:echo-all": "node scripts/listen-echo-all.js",
+    "smoke:e2ee-send": "node scripts/e2ee-send-smoke.js",
+    "debug:e2ee-send": "node scripts/e2ee-send-debug.js",
     "lint": "eslint \"src/**/*.js\" && eslint --env jest \"test/**/*.js\"",
     "prettier": "prettier \"src/**/*.js\" \"test/**/*.js\" --write"
   },

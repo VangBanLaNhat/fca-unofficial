@@ -233,6 +233,22 @@ function buildAPI(globalOptions, html, jar) {
     setOptions: setOptions.bind(null, globalOptions),
     getAppState: function getAppState() {
       return utils.getAppState(jar);
+    },
+    isFullyReady: function isFullyReady() {
+      var socketReady = !!(ctx.mqttClient && ctx.mqttClient.connected);
+      if (!socketReady) {
+        return false;
+      }
+
+      if (ctx.globalOptions.enableE2EE === false) {
+        return true;
+      }
+
+      if (!ctx._e2eeBridge || typeof ctx._e2eeBridge.isFullyReady !== "function") {
+        return false;
+      }
+
+      return ctx._e2eeBridge.isFullyReady();
     }
   };
 
@@ -252,9 +268,12 @@ function buildAPI(globalOptions, html, jar) {
   //Removing original `listen` that uses pull.
   //Map it to listenMqtt instead for backward compatibly.
   api.listen = api.listenMqtt;
-  api.sendMessageMqtt = api.sendMessage;
-  api.setMessageReactionMqtt = api.setMessageReaction;
-
+  if (typeof api.sendMessageMqtt !== "function") {
+    api.sendMessageMqtt = api.sendMessage;
+  }
+  if (typeof api.setMessageReactionMqtt !== "function") {
+    api.setMessageReactionMqtt = api.setMessageReaction;
+  }
   // Keep fb_dtsg/jazoest fresh to reduce long-session send failures.
   if (ctx.refreshDtsgTimer) {
     clearInterval(ctx.refreshDtsgTimer);

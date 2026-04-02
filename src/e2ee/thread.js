@@ -3,7 +3,7 @@
 function isE2EEChatJid(value) {
   return (
     typeof value === "string" &&
-    /@(user|group)\.facebook\.com$/i.test(value)
+    /(@(user|group)\.facebook\.com|@msgr(\.fb)?|@g\.us)$/i.test(value)
   );
 }
 
