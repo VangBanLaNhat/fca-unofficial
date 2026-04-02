@@ -44,6 +44,21 @@ var topics = ["/legacy_web",
 function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
 	ctx._stopListening = false;
 	ctx._mqttReconnectPending = false;
+	ctx._socketReady = false;
+
+	function maybeEmitFullyReady() {
+		if (ctx._fullyReadyEmitted) return;
+		if (!ctx._socketReady) return;
+
+		var needsE2EE = ctx.globalOptions.enableE2EE !== false;
+		if (needsE2EE && !ctx._e2eeFullyReady) return;
+
+		ctx._fullyReadyEmitted = true;
+		globalCallback(null, {
+			type: "fullyReady",
+			isE2EE: needsE2EE
+		});
+	}
 
 	function scheduleReconnect() {
 		if (ctx._stopListening || !ctx.globalOptions.autoReconnect || ctx._mqttReconnectPending) return;
@@ -113,6 +128,7 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
 
 	var mqttClient = ctx.mqttClient;
 	mqttClient.on('error', function (err) {
+		ctx._socketReady = false;
 		log.error("listenMqtt", err);
 		cleanupMqttClient();
 		if (ctx.globalOptions.autoReconnect) scheduleReconnect();
@@ -158,7 +174,11 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
 
 		ctx.tmsWait = function () {
 			clearTimeout(rTimeout);
-			ctx.globalOptions.emitReady ? globalCallback({type: "ready",error: null}) : '';
+			ctx._socketReady = true;
+			if (ctx.globalOptions.emitReady) {
+				globalCallback(null, { type: "ready", error: null });
+			}
+			maybeEmitFullyReady();
 			delete ctx.tmsWait;
 		};
 	});
@@ -214,11 +234,13 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
 	});
 
 	mqttClient.on('close', function () {
+		ctx._socketReady = false;
 		if (ctx._stopListening) return;
 		scheduleReconnect();
 	});
 
 	mqttClient.on('disconnect',function () {
+		ctx._socketReady = false;
 		if (ctx._stopListening) return;
 		scheduleReconnect();
 	});
@@ -700,10 +722,34 @@ module.exports = function (defaultFuncs, api, ctx) {
 			msgEmitter.emit("message", message);
 		});
 
+		var rawCallback = globalCallback;
+		globalCallback = function (error, message) {
+			if (!error && message && message.type === "e2ee_fully_ready") {
+				ctx._e2eeFullyReady = true;
+				if (ctx._socketReady && !ctx._fullyReadyEmitted) {
+					ctx._fullyReadyEmitted = true;
+					rawCallback(null, {
+						type: "fullyReady",
+						isE2EE: true
+					});
+				}
+			}
+
+			if (!error && message && message.type === "e2ee_disconnected") {
+				ctx._e2eeFullyReady = false;
+				ctx._fullyReadyEmitted = false;
+			}
+
+			return rawCallback(error, message);
+		};
+
 		//Reset some stuff
 		if (!ctx.firstListen) ctx.lastSeqId = null;
 		ctx.syncToken = undefined;
 		ctx.t_mqttCalled = false;
+		ctx._socketReady = false;
+		ctx._e2eeFullyReady = ctx.globalOptions.enableE2EE === false;
+		ctx._fullyReadyEmitted = false;
 
 		//Same request as getThreadList
 		form = {

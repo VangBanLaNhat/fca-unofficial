@@ -194,7 +194,8 @@ function createBridge(ctx) {
     connectingPromise: null,
     listenerAttached: false,
     lastGlobalCallback: null,
-    lastReadyPayload: null
+    lastReadyPayload: null,
+    fullyReady: false
   };
 
   function ensureSupportedOptions() {
@@ -236,6 +237,7 @@ function createBridge(ctx) {
     });
 
     state.client.on("fullyReady", function () {
+      state.fullyReady = true;
       callUserCallback(globalCallback || state.lastGlobalCallback, null, {
         type: "e2ee_fully_ready",
         isE2EE: true
@@ -278,6 +280,7 @@ function createBridge(ctx) {
 
     state.client.on("disconnected", function (info) {
       state.connected = false;
+      state.fullyReady = false;
       callUserCallback(globalCallback || state.lastGlobalCallback, null, {
         type: "e2ee_disconnected",
         isE2EE: true,
@@ -329,6 +332,7 @@ function createBridge(ctx) {
 
       await state.client.connect();
       state.connected = true;
+      state.fullyReady = false;
       return state.client;
     })();
 
@@ -369,6 +373,21 @@ function createBridge(ctx) {
     ensureClient: ensureClient,
     isConnected: function () {
       return !!(state.client && state.connected);
+    },
+    isFullyReady: function () {
+      if (!state.client || !state.connected) {
+        return false;
+      }
+
+      if (typeof state.client.isFullyReady === "function") {
+        try {
+          return !!state.client.isFullyReady();
+        } catch (_) {
+          return !!state.fullyReady;
+        }
+      }
+
+      return !!state.fullyReady;
     },
     getDeviceData: async function () {
       var client = await ensureClient();
