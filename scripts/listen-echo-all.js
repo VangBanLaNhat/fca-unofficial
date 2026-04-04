@@ -198,7 +198,7 @@ function echoE2EE(event) {
 
       await delay(sendDelayMs);
       var info = await withTimeout(
-        api.sendMessageE2EE(chatJid, { text: replyText }),
+        api.sendMessage(replyText, chatJid),
         e2eeSendTimeoutMs,
         "e2ee send"
       );

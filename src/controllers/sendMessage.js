@@ -403,11 +403,6 @@ module.exports = function (defaultFuncs, api, ctx) {
     var threadIDType = utils.getType(threadID);
     var messageIDType = utils.getType(replyToMessage);
 
-    function errorToString(err) {
-      if (!err) return "unknown";
-      return String(err.error || err.message || err);
-    }
-
     // Auto E2EE mode: if threadID is chat JID, route to E2EE sender.
     if (e2eeThread.isE2EEChatJid(threadID)) {
       if (msgType !== "String" && msgType !== "Object") {
@@ -577,37 +572,6 @@ module.exports = function (defaultFuncs, api, ctx) {
           });
         });
       });
-    }
-
-    // Try MQTT first for non-E2EE chats; fallback to HTTP on failure.
-    if (
-      ctx.mqttClient &&
-      ctx.mqttClient.connected &&
-      !ctx.globalOptions.pageID &&
-      utils.getType(threadID) !== "Array" &&
-      !msg.url
-    ) {
-      api.sendMessageMqtt(msg, threadID, function (mqttErr, mqttData) {
-        if (!mqttErr) {
-          return callback(null, mqttData);
-        }
-
-        log.warn("sendMessage", "MQTT send failed, falling back to HTTP: " + errorToString(mqttErr));
-
-        sendViaHttp(function (httpErr, httpData) {
-          if (!httpErr) {
-            return callback(null, httpData);
-          }
-
-          return callback({
-            error: "Both MQTT and HTTP send failed.",
-            mqttError: errorToString(mqttErr),
-            httpError: errorToString(httpErr)
-          });
-        });
-      }, replyToMessage);
-
-      return returnPromise;
     }
 
     sendViaHttp(callback);
