@@ -558,23 +558,19 @@ module.exports = function (defaultFuncs, api, ctx) {
       replied_to_message_id: replyToMessage
     };
 
-    function sendViaHttp(cb) {
-      handleLocation(msg, form, cb, function () {
-        handleSticker(msg, form, cb, function () {
-          handleAttachment(msg, form, cb, function () {
-            handleUrl(msg, form, cb, function () {
-              handleEmoji(msg, form, cb, function () {
-                handleMention(msg, form, cb, function () {
-                  send(form, threadID, messageAndOTID, cb, isGroup);
-                });
-              });
-            });
-          });
-        });
-      });
-    }
-
-    sendViaHttp(callback);
+    handleLocation(msg, form, callback, () =>
+      handleSticker(msg, form, callback, () =>
+        handleAttachment(msg, form, callback, () =>
+          handleUrl(msg, form, callback, () =>
+            handleEmoji(msg, form, callback, () =>
+              handleMention(msg, form, callback, () =>
+                send(form, threadID, messageAndOTID, callback, isGroup)
+              )
+            )
+          )
+        )
+      )
+    );
 
     return returnPromise;
   };
