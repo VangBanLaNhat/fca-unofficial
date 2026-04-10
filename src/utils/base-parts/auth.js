@@ -13,6 +13,10 @@ function formatCookie(arr, url) {
 function makeDefaults(html, userID, ctx) {
   var reqCounter = 1;
   var fb_dtsg = parsing.getFrom(html, 'name="fb_dtsg" value="', '"');
+  var lsd = parsing.getFrom(html, '["LSD",[],{"token":"', '"');
+  if (!lsd) {
+    lsd = parsing.getFrom(html, 'name="lsd" value="', '"');
+  }
 
   var ttstamp = "2";
   for (var i = 0; i < fb_dtsg.length; i++) {
@@ -28,7 +32,8 @@ function makeDefaults(html, userID, ctx) {
       __rev: revision,
       __a: 1,
       fb_dtsg: ctx.fb_dtsg ? ctx.fb_dtsg : fb_dtsg,
-      jazoest: ctx.ttstamp ? ctx.ttstamp : ttstamp
+      jazoest: ctx.ttstamp ? ctx.ttstamp : ttstamp,
+      lsd: ctx.lsd ? ctx.lsd : lsd
     };
 
     if (!obj) return newObj;
@@ -124,8 +129,10 @@ function parseAndCheckLogin(ctx, defaultFuncs, retryCount) {
           "//" +
           data.request.uri.hostname +
           data.request.uri.pathname;
+        var reqHeaders = data.request && data.request.headers ? data.request.headers : {};
+        var reqContentType = reqHeaders["content-type"] || reqHeaders["Content-Type"] || "";
         if (
-          data.request.headers["Content-Type"].split(";")[0] ===
+          String(reqContentType).split(";")[0] ===
           "multipart/form-data"
         ) {
           return bluebird

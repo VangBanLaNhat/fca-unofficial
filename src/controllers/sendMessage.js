@@ -2,9 +2,9 @@
 
 var utils = require("../utils");
 var log = require("npmlog");
-var bluebird = require("bluebird");
 var path = require("path");
 var e2eeThread = require("../e2ee/thread");
+var createUploadAttachment = require("../service/uploadAttachment");
 
 var allowedProperties = {
   attachment: true,
@@ -19,6 +19,8 @@ var allowedProperties = {
 
 module.exports = function (defaultFuncs, api, ctx) {
   var sendMessageUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3";
+
+  var uploadAttachment = createUploadAttachment(defaultFuncs, ctx, log);
 
   function streamToBuffer(stream) {
     return new Promise(function (resolve, reject) {
@@ -50,58 +52,6 @@ module.exports = function (defaultFuncs, api, ctx) {
     }
 
     return { mediaType: "document", filename: filename };
-  }
-
-  function uploadAttachment(attachments, callback) {
-    var uploads = [];
-
-    // create an array of promises
-    for (var i = 0; i < attachments.length; i++) {
-      if (!utils.isReadableStream(attachments[i])) {
-        throw {
-          error:
-            "Attachment should be a readable stream and not " +
-            utils.getType(attachments[i]) +
-            "."
-        };
-      }
-
-      var form = {
-        upload_1024: attachments[i],
-        voice_clip: "true"
-      };
-
-      uploads.push(
-        defaultFuncs
-          .postFormData(
-            "https://upload.facebook.com/ajax/mercury/upload.php",
-            ctx.jar,
-            form,
-            {}
-          )
-          .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
-          .then(function (resData) {
-            if (resData.error) {
-              throw resData;
-            }
-
-            // We have to return the data unformatted unless we want to change it
-            // back in sendMessage.
-            return resData.payload.metadata[0];
-          })
-      );
-    }
-
-    // resolve all promises
-    bluebird
-      .all(uploads)
-      .then(function (resData) {
-        callback(null, resData);
-      })
-      .catch(function (err) {
-        log.error("uploadAttachment", err);
-        return callback(err);
-      });
   }
 
   function getUrl(url, callback) {
@@ -320,10 +270,49 @@ module.exports = function (defaultFuncs, api, ctx) {
         }
 
         files.forEach(function (file) {
-          var key = Object.keys(file);
-          var type = key[0]; // image_id, file_id, etc
+          if (!file || typeof file !== "object") {
+            log.warn("uploadAttachment", "Skipping empty attachment metadata entry.");
+            return;
+          }
+          var type = ["image_id", "gif_id", "file_id", "video_id", "audio_id"].find(
+            function (candidate) {
+              return file[candidate] != null;
+            }
+          );
+
+          if (!type) {
+            var key = Object.keys(file);
+            if (!key.length) {
+              log.warn("uploadAttachment", "Skipping attachment metadata entry without id key.");
+              return;
+            }
+            type = key[0]; // fallback for legacy/unknown metadata shape
+          }
+
+          if (!Array.isArray(form["" + type + "s"])) {
+            log.warn("uploadAttachment", "Unsupported attachment id type: " + type);
+            return;
+          }
+
+          if (file[type] == null) {
+            log.warn("uploadAttachment", "Skipping attachment metadata entry with empty id value.");
+            return;
+          }
+
           form["" + type + "s"].push(file[type]); // push the id
         });
+
+        var uploadedIdCount =
+          form["image_ids"].length +
+          form["gif_ids"].length +
+          form["file_ids"].length +
+          form["video_ids"].length +
+          form["audio_ids"].length;
+
+        if (uploadedIdCount === 0) {
+          return callback({ error: "Attachment upload failed: no attachment id returned." });
+        }
+
         cb();
       });
     } else {

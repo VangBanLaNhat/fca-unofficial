@@ -29,11 +29,14 @@ function getHeaders(url, options, ctx, customHeader) {
 
   var headers = {
     host: host,
-    "content-type": "application/x-www-form-urlencoded",
+    accept: "*/*",
+    "accept-language": "vi",
     referer: "https://www.facebook.com/",
     origin: "https://www.facebook.com",
     connection: "keep-alive",
     "Sec-Fetch-Site": "same-origin",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Dest": "empty",
     "Sec-Fetch-User": "?1",
     "User-Agent": userAgent
   };
@@ -47,6 +50,14 @@ function getHeaders(url, options, ctx, customHeader) {
   }
   if (ctx && ctx.region) {
     headers["X-MSGR-Region"] = ctx.region;
+  }
+
+  headers["x-asbd-id"] = (ctx && ctx.globalOptions && ctx.globalOptions.asbdID)
+    ? String(ctx.globalOptions.asbdID)
+    : "359341";
+
+  if (ctx && ctx.lsd) {
+    headers["x-fb-lsd"] = ctx.lsd;
   }
 
   return headers;
@@ -85,8 +96,13 @@ function get(url, jar, qs, options, ctx, customHeader) {
 }
 
 function post(url, jar, form, options, ctx, customHeader) {
+  var headers = getHeaders(url, options, ctx, customHeader);
+  if (!headers["content-type"] && !headers["Content-Type"]) {
+    headers["content-type"] = "application/x-www-form-urlencoded";
+  }
+
   var op = {
-    headers: getHeaders(url, options, ctx, customHeader),
+    headers: headers,
     timeout: 60000,
     url: url,
     method: "POST",
@@ -102,7 +118,6 @@ function post(url, jar, form, options, ctx, customHeader) {
 
 function postFormData(url, jar, form, qs, options, ctx) {
   var headers = getHeaders(url, options, ctx);
-  headers["Content-Type"] = "multipart/form-data";
   var op = {
     headers: headers,
     timeout: 60000,

@@ -2,61 +2,16 @@
 
 var utils = require("../utils");
 var log = require("npmlog");
-var bluebird = require("bluebird");
+var createUploadAttachment = require("../service/uploadAttachment");
 
 module.exports = function (defaultFuncs, _api, ctx) {
   var mqttVariance = 0;
 
+  var uploadAttachment = createUploadAttachment(defaultFuncs, ctx, log);
+
   function mqttEpochID() {
     mqttVariance = (mqttVariance + 0.1) % 5;
     return Math.floor(Date.now() * (4194304 + mqttVariance));
-  }
-
-  function uploadAttachment(attachments, callback) {
-    var uploads = [];
-
-    for (var i = 0; i < attachments.length; i++) {
-      if (!utils.isReadableStream(attachments[i])) {
-        throw {
-          error:
-            "Attachment should be a readable stream and not " +
-            utils.getType(attachments[i]) +
-            "."
-        };
-      }
-
-      var form = {
-        upload_1024: attachments[i],
-        voice_clip: "true"
-      };
-
-      uploads.push(
-        defaultFuncs
-          .postFormData(
-            "https://upload.facebook.com/ajax/mercury/upload.php",
-            ctx.jar,
-            form,
-            {}
-          )
-          .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
-          .then(function (resData) {
-            if (resData.error) {
-              throw resData;
-            }
-            return resData.payload.metadata[0];
-          })
-      );
-    }
-
-    bluebird
-      .all(uploads)
-      .then(function (resData) {
-        callback(null, resData);
-      })
-      .catch(function (err) {
-        log.error("uploadAttachment", err);
-        return callback(err);
-      });
   }
 
   return function sendMessageMqtt(msg, threadID, callback, replyToMessage) {
@@ -245,10 +200,35 @@ module.exports = function (defaultFuncs, _api, ctx) {
         : form.payload.tasks[0].payload;
 
       files.forEach(function (file) {
-        var key = Object.keys(file);
-        var type = key[0];
+        if (!file || typeof file !== "object") {
+          return;
+        }
+
+        var type = ["image_id", "gif_id", "file_id", "video_id", "audio_id"].find(
+          function (candidate) {
+            return file[candidate] != null;
+          }
+        );
+
+        if (!type) {
+          var key = Object.keys(file);
+          if (!key.length) {
+            return;
+          }
+          type = key[0];
+        }
+
+        if (file[type] == null) {
+          return;
+        }
+
         attachmentPayload.attachment_fbids.push(file[type]);
       });
+
+      if (!attachmentPayload.attachment_fbids.length) {
+        return callback({ error: "Attachment upload failed: no attachment id returned." });
+      }
+
       publish();
     });
   };

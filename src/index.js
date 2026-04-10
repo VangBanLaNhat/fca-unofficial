@@ -131,6 +131,8 @@ function setOptions(globalOptions, options) {
 function buildAPI(globalOptions, html, jar) {
   var fbDtsgMatch = html.match(/DTSGInitialData.*?token":"(.*?)"/);
   var initialFbDtsg = fbDtsgMatch ? fbDtsgMatch[1] : null;
+  var lsdMatch = html.match(/\["LSD",\[\],\{"token":"(.*?)"\}/);
+  var initialLsd = lsdMatch ? lsdMatch[1] : null;
   var initialTtstamp = null;
   if (initialFbDtsg) {
     initialTtstamp = "2";
@@ -225,6 +227,7 @@ function buildAPI(globalOptions, html, jar) {
     wsTaskNumber: 0,
     fb_dtsg: initialFbDtsg,
     ttstamp: initialTtstamp,
+    lsd: initialLsd,
     _e2eeBridge: null,
     _e2eeDeviceData: globalOptions.e2eeDeviceData || null
   };
