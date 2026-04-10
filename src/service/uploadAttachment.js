@@ -87,7 +87,7 @@ module.exports = function createUploadAttachment(defaultFuncs, ctx, logger) {
         };
       }
 
-      var form = {
+      const form = {
         farr: attachment,
         voice_clip: "true"
       };
