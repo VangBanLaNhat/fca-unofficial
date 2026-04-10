@@ -39,6 +39,11 @@
     "request": "^2.88.2",
     "websocket-stream": "^5.5.2"
   },
+  "pnpm": {
+    "overrides": {
+      "request@2.88.2>form-data": "2.5.5"
+    }
+  },
   "engines": {
     "node": ">=22.0.0"
   },
