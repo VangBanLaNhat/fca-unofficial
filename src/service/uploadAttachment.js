@@ -5,6 +5,41 @@ var bluebird = require("bluebird");
 var utils = require("../utils");
 
 function stringifyUploadResponse(resData) {
+  if (resData instanceof Error) {
+    var errInfo = {
+      name: resData.name,
+      message: resData.message
+    };
+    if (resData.code !== undefined) errInfo.code = resData.code;
+    if (resData.statusCode !== undefined) errInfo.statusCode = resData.statusCode;
+    try {
+      return JSON.stringify(errInfo);
+    } catch (_) {
+      return String(resData.message || resData);
+    }
+  }
+
+  if (resData && typeof resData === "object") {
+    var commonErr = {
+      message: resData.message,
+      error: resData.error,
+      code: resData.code,
+      statusCode: resData.statusCode
+    };
+    if (
+      commonErr.message !== undefined ||
+      commonErr.error !== undefined ||
+      commonErr.code !== undefined ||
+      commonErr.statusCode !== undefined
+    ) {
+      try {
+        return JSON.stringify(commonErr);
+      } catch (_) {
+        return String(resData);
+      }
+    }
+  }
+
   try {
     return JSON.stringify(resData);
   } catch (_) {
@@ -58,6 +93,26 @@ function extractUploadMetadata(resData) {
   }
 
   return [];
+}
+
+function extractStatusCode(err) {
+  if (!err) return null;
+  if (typeof err.statusCode === "number") return err.statusCode;
+
+  var message = "";
+  if (typeof err === "string") message += err;
+  if (err && typeof err.message === "string") message += " " + err.message;
+  if (err && typeof err.error === "string") message += " " + err.error;
+
+  var match = message.match(/status code:\s*(\d{3})/i);
+  return match ? Number(match[1]) : null;
+}
+
+function shouldTryLegacyHostFallback(err) {
+  var statusCode = extractStatusCode(err);
+  if (statusCode === 408 || statusCode === 429) return true;
+  if (typeof statusCode === "number" && statusCode >= 500 && statusCode < 600) return true;
+  return false;
 }
 
 module.exports = function createUploadAttachment(defaultFuncs, ctx, logger) {
@@ -187,6 +242,61 @@ module.exports = function createUploadAttachment(defaultFuncs, ctx, logger) {
                   error: "Upload succeeded but did not return attachment metadata.",
                   res: fallbackData,
                   firstRes: resData
+                };
+              });
+          })
+          .catch(function (primaryErr) {
+            if (!attachmentPath || !shouldTryLegacyHostFallback(primaryErr)) {
+              throw primaryErr;
+            }
+
+            var fallbackForm = {
+              upload_1024: fs.createReadStream(attachmentPath),
+              voice_clip: "true"
+            };
+
+            return defaultFuncs
+              .postFormData(
+                "https://upload.facebook.com/ajax/mercury/upload.php",
+                ctx.jar,
+                fallbackForm,
+                {}
+              )
+              .then(function (fallbackRawRes) {
+                return {
+                  fallbackRawRes: fallbackRawRes,
+                  fallbackReqDebug: pickUploadRequestDebug(fallbackRawRes)
+                };
+              })
+              .then(function (fallbackBundle) {
+                return utils.parseAndCheckLogin(ctx, defaultFuncs)(fallbackBundle.fallbackRawRes)
+                  .then(function (fallbackData) {
+                    return {
+                      fallbackData: fallbackData,
+                      fallbackReqDebug: fallbackBundle.fallbackReqDebug
+                    };
+                  });
+              })
+              .then(function (fallbackBundle) {
+                var fallbackData = fallbackBundle.fallbackData;
+                var fallbackReqDebug = fallbackBundle.fallbackReqDebug;
+
+                if (fallbackData.error) {
+                  throw fallbackData;
+                }
+
+                var fallbackMetadata = extractUploadMetadata(fallbackData);
+                if (fallbackMetadata.length) {
+                  return fallbackMetadata[0];
+                }
+
+                writeError("Raw upload response (legacy host fallback empty metadata): " + stringifyUploadResponse(fallbackData));
+                writeError("Legacy host request debug: " + stringifyUploadResponse(fallbackReqDebug));
+
+                throw {
+                  error: "Upload succeeded but did not return attachment metadata.",
+                  res: fallbackData,
+                  firstErr: primaryErr
                 };
               });
           })

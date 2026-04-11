@@ -103,6 +103,36 @@ function parseAndCheckLogin(ctx, defaultFuncs, retryCount) {
   return function (data) {
     return bluebird.try(function () {
       log.verbose("parseAndCheckLogin", data.body);
+
+      function isMercuryUploadRequest() {
+        var pathname = data && data.request && data.request.uri
+          ? data.request.uri.pathname
+          : "";
+        return typeof pathname === "string" && pathname.indexOf("/ajax/mercury/upload.php") !== -1;
+      }
+
+      function hasUploadMetadata(parsed) {
+        var metadata = parsed && parsed.payload ? parsed.payload.metadata : null;
+        if (Array.isArray(metadata)) return metadata.length > 0;
+        return !!(metadata && typeof metadata === "object" && Object.keys(metadata).length);
+      }
+
+      function tryParseUploadPayloadFromNon200() {
+        if (!isMercuryUploadRequest()) return null;
+        if (!data || typeof data.body !== "string" || data.body.trim() === "") return null;
+
+        try {
+          var parsedUpload = JSON.parse(parsing.makeParsable(data.body));
+          if (parsedUpload && !parsedUpload.error && hasUploadMetadata(parsedUpload)) {
+            return parsedUpload;
+          }
+        } catch (_) {
+          return null;
+        }
+
+        return null;
+      }
+
       if (data.statusCode >= 500 && data.statusCode < 600) {
         if (retryCount >= 5) {
           throw {
@@ -155,12 +185,22 @@ function parseAndCheckLogin(ctx, defaultFuncs, retryCount) {
             .then(parseAndCheckLogin(ctx, defaultFuncs, retryCount));
         }
       }
-      if (data.statusCode !== 200)
+      if (data.statusCode !== 200) {
+        var parsedUploadFromNon200 = tryParseUploadPayloadFromNon200();
+        if (parsedUploadFromNon200) {
+          log.warn(
+            "parseAndCheckLogin",
+            "Parsed mercury upload payload from non-200 status " + data.statusCode
+          );
+          return parsedUploadFromNon200;
+        }
+
         throw new Error(
           "parseAndCheckLogin got status code: " +
           data.statusCode +
           ". Bailing out of trying to parse response."
         );
+      }
 
       var res = null;
       try {

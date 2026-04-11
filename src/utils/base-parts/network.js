@@ -118,9 +118,23 @@ function post(url, jar, form, options, ctx, customHeader) {
 
 function postFormData(url, jar, form, qs, options, ctx) {
   var headers = getHeaders(url, options, ctx);
+  var timeout = 60000;
+
+  if (typeof url === "string" && url.indexOf("/ajax/mercury/upload.php") !== -1) {
+    var customUploadTimeout = ctx && ctx.globalOptions
+      ? Number(ctx.globalOptions.uploadAttachmentTimeout)
+      : NaN;
+
+    if (!isNaN(customUploadTimeout) && customUploadTimeout > 0) {
+      timeout = customUploadTimeout;
+    } else {
+      timeout = 180000;
+    }
+  }
+
   var op = {
     headers: headers,
-    timeout: 60000,
+    timeout: timeout,
     url: url,
     method: "POST",
     formData: form,
