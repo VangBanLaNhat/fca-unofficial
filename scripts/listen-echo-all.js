@@ -141,7 +141,12 @@ function echoRegular(event) {
     var endTypingFn = null;
 
     if (!silent) {
-      console.log("[listen-echo-all] regular echo queue", "threadID=" + threadID, "isGroup=" + isGroup, "delayMs=" + sendDelayMs, "chars=" + (replyText.length - 6));
+      // console.log("[listen-echo-all] regular echo queue", "threadID=" + threadID, "isGroup=" + isGroup, "delayMs=" + sendDelayMs, "chars=" + (replyText.length - 6));
+      console.log(
+          "[listen]",
+          nowIso(),
+          event
+      )
     }
 
     try {
@@ -256,15 +261,20 @@ login(
         var chatJid = event.e2ee && event.e2ee.chatJid;
         var senderJid = event.e2ee && event.e2ee.senderJid;
         var body = typeof event.body === "string" ? event.body : "";
+        // console.log(
+        //   "[listen-echo-all]",
+        //   nowIso(),
+        //   "type=" + (event.type || "unknown"),
+        //   "threadID=" + (event.threadID || ""),
+        //   "chatJid=" + (chatJid || ""),
+        //   "senderID=" + (event.senderID || ""),
+        //   "senderJid=" + (senderJid || ""),
+        //   "body=" + body
+        // );
         console.log(
-          "[listen-echo-all]",
+          "[listen-e2ee]",
           nowIso(),
-          "type=" + (event.type || "unknown"),
-          "threadID=" + (event.threadID || ""),
-          "chatJid=" + (chatJid || ""),
-          "senderID=" + (event.senderID || ""),
-          "senderJid=" + (senderJid || ""),
-          "body=" + body
+          event
         );
       }
 

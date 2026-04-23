@@ -369,6 +369,47 @@ function formatID(id) {
 
 function formatDeltaMessage(m) {
   var md = m.delta.messageMetadata;
+  var body = m.delta.body || "";
+
+  function splitCsv(value) {
+    if (Array.isArray(value)) return value;
+    if (typeof value !== "string") return [];
+    return value
+      .split(",")
+      .map(function (v) { return v.trim(); })
+      .filter(function (v) { return v !== ""; });
+  }
+
+  function fillMentionsFromTriples(target, ids, offsets, lengths) {
+    var max = Math.min(ids.length, offsets.length, lengths.length);
+    for (var i = 0; i < max; i++) {
+      var id = String(ids[i] || "").trim();
+      if (!id) continue;
+
+      var offset = parseInt(offsets[i], 10);
+      var length = parseInt(lengths[i], 10);
+      if (isNaN(offset) || isNaN(length) || length <= 0) continue;
+
+      target[id] = body.substring(offset, offset + length);
+    }
+  }
+
+  function readFbTypedValue(node) {
+    if (!node || typeof node !== "object") return undefined;
+    if (node.asString != null) return node.asString;
+    if (node.asLong != null) return node.asLong;
+    if (node.asInt != null) return node.asInt;
+    return undefined;
+  }
+
+  function getGbMentionMapFromMetadata(metadata) {
+    if (!metadata || typeof metadata !== "object") return null;
+    var d = metadata.data || {};
+    var nested = d.data || {};
+    var gb = nested.Gb || d.Gb;
+    var map = gb && gb.asMap && gb.asMap.data;
+    return map && typeof map === "object" ? map : null;
+  }
 
   var mdata =
     m.delta.data === undefined
@@ -380,14 +421,61 @@ function formatDeltaMessage(m) {
   var m_offset = mdata.map(function (u) { return u.o; });
   var m_length = mdata.map(function (u) { return u.l; });
   var mentions = {};
-  for (var i = 0; i < m_id.length; i++) {
-    mentions[m_id[i]] = m.delta.body.substring(m_offset[i], m_offset[i] + m_length[i]);
+  fillMentionsFromTriples(mentions, m_id, m_offset, m_length);
+
+  // Some payloads provide mentions as CSV fields instead of prng JSON.
+  if (Object.keys(mentions).length === 0) {
+    var d = m.delta.data || {};
+    fillMentionsFromTriples(
+      mentions,
+      splitCsv(d.mention_ids || m.delta.mention_ids),
+      splitCsv(d.mention_offsets || m.delta.mention_offsets),
+      splitCsv(d.mention_lengths || m.delta.mention_lengths)
+    );
+  }
+
+  // Fallback for range-based metadata variants.
+  if (Object.keys(mentions).length === 0) {
+    var ranges = [];
+    if (Array.isArray(m.delta.ranges)) ranges = m.delta.ranges;
+    else if (Array.isArray((m.delta.data || {}).ranges)) ranges = m.delta.data.ranges;
+    else if (Array.isArray(m.delta.profileRanges)) ranges = m.delta.profileRanges;
+
+    ranges.forEach(function (r) {
+      var id =
+        (r && r.entity && r.entity.id) ||
+        (r && r.id) ||
+        (r && r.i);
+      var offset = (r && (r.offset != null ? r.offset : r.o));
+      var length = (r && (r.length != null ? r.length : r.l));
+      fillMentionsFromTriples(mentions, [id], [offset], [length]);
+    });
+  }
+
+  // Newer payload variant stores mention entries in messageMetadata.data.data.Gb.asMap.data.
+  if (Object.keys(mentions).length === 0) {
+    var gbMap = getGbMentionMapFromMetadata(md);
+    if (gbMap) {
+      var ids = [];
+      var offsets = [];
+      var lengths = [];
+
+      Object.keys(gbMap).forEach(function (k) {
+        var row = gbMap[k] && gbMap[k].asMap && gbMap[k].asMap.data;
+        if (!row) return;
+        ids.push(readFbTypedValue(row.id));
+        offsets.push(readFbTypedValue(row.offset));
+        lengths.push(readFbTypedValue(row.length));
+      });
+
+      fillMentionsFromTriples(mentions, ids, offsets, lengths);
+    }
   }
 
   return {
     type: "message",
     senderID: formatID(md.actorFbId.toString()),
-    body: m.delta.body || "",
+    body: body,
     threadID: formatID((md.threadKey.threadFbId || md.threadKey.otherUserFbId).toString()),
     messageID: md.messageId,
     attachments: (m.delta.attachments || []).map(function (v) { return _formatAttachment(v); }),
