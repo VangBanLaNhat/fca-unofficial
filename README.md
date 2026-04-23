@@ -241,6 +241,17 @@ Auto routing behavior:
 > });
 > ```
 
+8. If my project installs `fca-unofficial` as a dependency, do I need to run `pnpm run build:e2ee` in that project?
+> Usually no. That script lives in `fca-unofficial` itself, so it is only available when you run it inside the package that defines it. For consuming projects, the normal flow is to install dependencies and let `meta-messenger.js` download its prebuilt bridge during install.
+>
+> If you want your own app to expose a wrapper, you can add a script like this in your app's `package.json`:
+> ```json
+>   "scripts": {
+>     "build:e2ee": "node -e \"const cp=require('child_process');const fs=require('fs');const path=require('path');const {createRequire}=require('module');const fcaPkg=require.resolve('fca-unofficial/package.json');const fcaRequire=createRequire(fcaPkg);let metaPkg;try{metaPkg=fcaRequire.resolve('meta-messenger.js/package.json');}catch(e){console.error('meta-messenger.js not found from fca-unofficial context. Run: pnpm add meta-messenger.js');process.exit(1);}const p=path.dirname(metaPkg);cp.execSync('pnpm install --force --ignore-scripts=false',{cwd:p,stdio:'inherit',shell:true});cp.execSync('node scripts/postinstall.mjs',{cwd:p,stdio:'inherit',shell:true});let ext='so';if(process.platform==='win32') ext='dll';if(process.platform==='darwin') ext='dylib';const out=path.join(p,'build','messagix.'+ext);if(!fs.existsSync(out)){console.error('E2EE native bridge was not created: '+out);console.error('Try: MESSAGIX_BUILD_FROM_SOURCE=true pnpm run build:e2ee (requires Go)');process.exit(1);}console.log('E2EE bridge ready: '+out);\""
+>   }
+> ```
+> If the bridge is still missing, rebuild from source with `MESSAGIX_BUILD_FROM_SOURCE=true` and Go 1.24+.
+
 <a name="projects-using-this-api"></a>
 ## Projects using this API:
 

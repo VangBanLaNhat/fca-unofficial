@@ -69,6 +69,24 @@ Run the test suites with the current Jest scripts:
 
 ---------------------------------------
 
+### E2EE build FAQ
+
+If your project installs `fca-unofficial` as a dependency, you usually do not run `pnpm run build:e2ee` from that consuming project.
+
+That script is defined in `fca-unofficial` itself, so it is only available when you run it inside the package that owns the script. In most cases, the normal install flow is enough because `meta-messenger.js` will try to download a prebuilt native bridge during install.
+
+If the bridge is missing or you want to force a rebuild, run `pnpm run build:e2ee` inside the `fca-unofficial` package. If you want your own app to expose a wrapper, you can add a script like this to that app's `package.json`:
+
+```json
+"scripts": {
+	"build:e2ee": "node -e \"const cp=require('child_process');const fs=require('fs');const path=require('path');const {createRequire}=require('module');const fcaPkg=require.resolve('fca-unofficial/package.json');const fcaRequire=createRequire(fcaPkg);let metaPkg;try{metaPkg=fcaRequire.resolve('meta-messenger.js/package.json');}catch(e){console.error('meta-messenger.js not found from fca-unofficial context. Run: pnpm add meta-messenger.js');process.exit(1);}const p=path.dirname(metaPkg);cp.execSync('pnpm install --force --ignore-scripts=false',{cwd:p,stdio:'inherit',shell:true});cp.execSync('node scripts/postinstall.mjs',{cwd:p,stdio:'inherit',shell:true});let ext='so';if(process.platform==='win32') ext='dll';if(process.platform==='darwin') ext='dylib';const out=path.join(p,'build','messagix.'+ext);if(!fs.existsSync(out)){console.error('E2EE native bridge was not created: '+out);console.error('Try: MESSAGIX_BUILD_FROM_SOURCE=true pnpm run build:e2ee (requires Go)');process.exit(1);}console.log('E2EE bridge ready: '+out);\""
+}
+```
+
+If no prebuilt binary is available, rebuild from source with `MESSAGIX_BUILD_FROM_SOURCE=true` and Go 1.24+.
+
+---------------------------------------
+
 ### Password safety
 
 **Read this** before you _copy+paste_ examples from below.
@@ -1955,6 +1973,18 @@ You can pass E2EE context to auto-route unsend:
 * `api.unsendMessage(messageID, callback, chatJid)`
 
 When `chatJid` is an E2EE chat JID, the API routes to E2EE unsend automatically.
+
+---------------------------------------
+
+### E2EE bridge build
+
+`fca-unofficial` uses `meta-messenger.js` for the native E2EE bridge. If the native `messagix` binary is missing after install, run:
+
+```bash
+pnpm run build:e2ee
+```
+
+The script resolves the installed `meta-messenger.js` package, reruns its `postinstall` hook, and verifies `build/messagix.so|dll|dylib`. If you need to compile from source, rerun with `MESSAGIX_BUILD_FROM_SOURCE=true pnpm run build:e2ee`. Source builds require Go 1.24+.
 
 ---------------------------------------
 
