@@ -11,10 +11,12 @@
 * [`api.changeNickname`](#changeNickname)
 * [`api.changeThreadColor`](#changeThreadColor)
 * [`api.changeThreadEmoji`](#changeThreadEmoji)
+* [`api.connectE2EE`](#connectE2EE)
 * [`api.createNewGroup`](#createNewGroup)
 * [`api.createPoll`](#createPoll)
 * [`api.deleteMessage`](#deleteMessage)
 * [`api.deleteThread`](#deleteThread)
+* [`api.disconnectE2ee`](#disconnectE2ee)
 * [`api.editMessage`](#editMessage)
 * [`api.forwardAttachment`](#forwardAttachment)
 * [`api.getAppState`](#getAppState)
@@ -45,12 +47,20 @@
 * [`api.resolvePhotoUrl`](#resolvePhotoUrl)
 * [`api.searchForThread`](#searchForThread)
 * [`api.sendMessage`](#sendMessage)
+* [`api.sendAudioE2ee`](#sendAudioE2ee)
+* [`api.sendFileE2ee`](#sendFileE2ee)
+* [`api.sendImageE2ee`](#sendImageE2ee)
+* [`api.sendMessageE2ee`](#sendMessageE2ee)
+* [`api.sendReactionE2ee`](#sendReactionE2ee)
+* [`api.sendTypingE2ee`](#sendTypingE2ee)
 * [`api.sendTypingIndicator`](#sendTypingIndicator)
+* [`api.sendVideoE2ee`](#sendVideoE2ee)
 * [`api.setMessageReaction`](#setMessageReaction)
 * [`api.setOptions`](#setOptions)
 * [`api.setTitle`](#setTitle)
 * [`api.threadColors`](#threadColors)
 * [`api.unsendMessage`](#unsendMessage)
+* [`api.unsendMessageE2ee`](#unsendMessageE2ee)
 
 ---------------------------------------
 
@@ -125,7 +135,7 @@ __Arguments__
 __Example (Email & Password)__
 
 ```js
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({email: "FB_EMAIL", password: "FB_PASSWORD"}, (err, api) => {
     if(err) return console.error(err);
@@ -137,7 +147,7 @@ __Example (Email & Password then save appState to file)__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({email: "FB_EMAIL", password: "FB_PASSWORD"}, (err, api) => {
     if(err) return console.error(err);
@@ -150,7 +160,7 @@ __Example (AppState loaded from file)__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -164,7 +174,7 @@ __Example__:
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 const readline = require("readline");
 
 var rl = readline.createInterface({
@@ -255,7 +265,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if (err) return console.error(err);
@@ -291,7 +301,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -346,7 +356,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -374,7 +384,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -404,7 +414,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -433,7 +443,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -443,6 +453,47 @@ login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, ap
     });
 });
 ```
+
+---------------------------------------
+
+<a name="connectE2EE"></a>
+### api.connectE2EE(options[, callback])
+
+Starts an E2EE session on top of the existing auth. This is required before using any other E2EE actions.
+
+Returns an `E2EEEmitter` that bridges all Messenger E2EE events.
+
+__Arguments__
+
+* `options`: An object containing:
+    * `deviceStorePath`: (Required) Path to `device-store.json`. This file stores your E2EE identity and should be kept persistent between restarts.
+    * `sessionStorePath`: (Optional) Path to `session.json` for auth metadata.
+* `callback(err, event)`: (Optional) A callback called for every incoming E2EE event.
+
+__Example (EventEmitter style)__
+
+```js
+var emitter = api.connectE2EE({ deviceStorePath: "./device-store.json" });
+emitter.on("message", function(event) {
+  if (event.type === "e2ee_message") {
+    console.log("From: " + event.data.senderId + " | Body: " + event.data.text);
+  }
+});
+emitter.on("error", function(err) { console.error(err); });
+```
+
+__E2EE Events__
+
+When listening via `api.connectE2EE`, events follow this structure:
+- `type`: `"e2ee_message"`, `"e2ee_reaction"`, `"e2ee_typing"`, `"e2ee_connected"`, `"e2ee_disconnected"`, etc.
+- `data`: Event payload.
+
+For `e2ee_message`:
+- `data.threadId`: Source ID.
+- `data.senderId`: Sender's numeric ID.
+- `data.text`: Decrypted text.
+- `data.messageId`: Message ID.
+- `data.isGroup`: Boolean.
 
 ---------------------------------------
 
@@ -473,7 +524,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -501,7 +552,7 @@ __Arguments__
 __Example__
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -534,7 +585,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -542,6 +593,26 @@ login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, ap
     api.deleteThread("000000000000000", (err) => {
         if(err) return console.error(err);
     });
+});
+```
+
+---------------------------------------
+
+<a name="disconnectE2ee"></a>
+### api.disconnectE2ee([callback])
+
+Disconnects the active E2EE stream (Noise socket, heartbeat, prekey maintenance).
+
+__Arguments__
+
+* `callback(err)`: (Optional) A callback called when the disconnection is done.
+
+__Example__
+
+```js
+api.disconnectE2ee((err) => {
+  if (err) return console.error(err);
+  console.log("E2EE disconnected");
 });
 ```
 
@@ -563,7 +634,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -621,7 +692,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -651,7 +722,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -1062,7 +1133,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -1094,7 +1165,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -1483,7 +1554,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 // Simple echo bot. He'll repeat anything that you say.
 // Will stop when you say '/stop'
@@ -1578,7 +1649,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -1623,7 +1694,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -1722,7 +1793,7 @@ __Tip__: to find your own ID, you can look inside the cookies. The `userID` is u
 __Example (Basic Message)__
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -1736,7 +1807,7 @@ login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, ap
 __Example (File upload)__
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, api) => {
     if(err) return console.error(err);
@@ -1753,7 +1824,7 @@ login({appState: JSON.parse(fs.readFileSync('appstate.json', 'utf8'))}, (err, ap
 
 __Example (Mention)__
 ```js
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 login({email: "EMAIL", password: "PASSWORD"}, (err, api) => {
     if(err) return console.error(err);
@@ -1777,7 +1848,7 @@ login({email: "EMAIL", password: "PASSWORD"}, (err, api) => {
 
 __Example (Location)__
 ```js
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 login({email: "EMAIL", password: "PASSWORD"}, (err, api) => {
     if(err) return console.error(err);
     var yourID = "000000000000000";
@@ -1785,6 +1856,196 @@ login({email: "EMAIL", password: "PASSWORD"}, (err, api) => {
     	location: { latitude: 48.858093, longitude: 2.294694, current: true },
   	};
     api.sendMessage(msg, yourID);
+});
+    api.sendMessage(msg, yourID);
+});
+```
+
+---------------------------------------
+
+<a name="sendAudioE2ee"></a>
+### api.sendAudioE2ee(input[, callback])
+
+Encrypts and sends an E2EE audio message. Only supported for one-to-one E2EE chats.
+
+__Arguments__
+
+* `input`: An object containing:
+    * `threadId`: Numeric user ID or @msgr JID.
+    * `data`: Buffer containing the raw audio bytes.
+    * `mimeType`: (Optional) MIME type (default: `audio/ogg`).
+    * `fileName`: (Optional) File name hint.
+    * `replyToMessageId`: (Optional) Message ID to reply to.
+
+__Example__
+
+```js
+const fs = require("fs");
+api.sendAudioE2ee({
+  threadId: "1234567890",
+  data: fs.readFileSync("./voice.ogg")
+}, (err, res) => {
+  if (err) return console.error(err);
+});
+```
+
+---------------------------------------
+
+<a name="sendFileE2ee"></a>
+### api.sendFileE2ee(input[, callback])
+
+Encrypts and sends an E2EE file/document. Only supported for one-to-one E2EE chats.
+
+__Arguments__
+
+* `input`: An object containing:
+    * `threadId`: Numeric user ID or @msgr JID.
+    * `data`: Buffer containing the raw file bytes.
+    * `mimeType`: (Optional) MIME type.
+    * `fileName`: (Required) File name shown in Messenger.
+    * `caption`: (Optional) Caption text.
+    * `replyToMessageId`: (Optional) Message ID to reply to.
+
+__Example__
+
+```js
+const fs = require("fs");
+api.sendFileE2ee({
+  threadId: "1234567890",
+  data: fs.readFileSync("./document.pdf"),
+  fileName: "document.pdf"
+}, (err, res) => {
+  if (err) return console.error(err);
+});
+```
+
+---------------------------------------
+
+<a name="sendImageE2ee"></a>
+### api.sendImageE2ee(input[, callback])
+
+Encrypts and sends an E2EE image. Only supported for one-to-one E2EE chats.
+
+__Arguments__
+
+* `input`: An object containing:
+    * `threadId`: Numeric user ID or @msgr JID.
+    * `data`: Buffer containing the raw image bytes.
+    * `mimeType`: (Optional) MIME type (default: `image/png`).
+    * `fileName`: (Optional) File name hint.
+    * `caption`: (Optional) Caption text.
+    * `replyToMessageId`: (Optional) Message ID to reply to.
+
+__Example__
+
+```js
+const fs = require("fs");
+api.sendImageE2ee({
+  threadId: "1234567890",
+  data: fs.readFileSync("./photo.jpg"),
+  caption: "Look at this!"
+}, (err, res) => {
+  if (err) return console.error(err);
+});
+```
+
+---------------------------------------
+
+<a name="sendMessageE2ee"></a>
+### api.sendMessageE2ee(input[, callback])
+
+Sends an E2EE text message. Supports both one-to-one and group E2EE chats.
+
+__Arguments__
+
+* `input`: An object containing:
+    * `threadId`: Numeric user ID, @msgr JID, or group JID.
+    * `text`: Message body.
+    * `replyToMessageId`: (Optional) Message ID to reply to.
+
+__Example__
+
+```js
+api.sendMessageE2ee({ threadId: "1234567890", text: "Hello E2EE!" }, (err, res) => {
+  if (err) return console.error(err);
+  console.log("Sent with ID: " + res.messageId);
+});
+```
+
+---------------------------------------
+
+<a name="sendReactionE2ee"></a>
+### api.sendReactionE2ee(input[, callback])
+
+Sends an E2EE reaction to a message.
+
+__Arguments__
+
+* `input`: An object containing:
+    * `threadId`: Numeric ID, @msgr JID, or group JID.
+    * `messageId`: ID of the message to react to.
+    * `senderJid`: Device JID of the message sender (required for group encoding).
+    * `reaction`: Emoji string (e.g. "👍"). Use empty string to remove.
+
+__Example__
+
+```js
+api.sendReactionE2ee({
+  threadId: "1234567890",
+  messageId: "mid.123...",
+  senderJid: "1234567890.1:0@msgr",
+  reaction: "❤️"
+}, (err) => {
+  if (err) return console.error(err);
+});
+```
+
+---------------------------------------
+
+<a name="sendTypingE2ee"></a>
+### api.sendTypingE2ee(input[, callback])
+
+Sends an E2EE typing indicator (composing/paused).
+
+__Arguments__
+
+* `input`: An object containing:
+    * `threadId`: Numeric ID, @msgr JID, or group JID.
+    * `isTyping`: Boolean (`true` for typing, `false` for paused).
+
+__Example__
+
+```js
+api.sendTypingE2ee({ threadId: "1234567890", isTyping: true });
+setTimeout(() => api.sendTypingE2ee({ threadId: "1234567890", isTyping: false }), 3000);
+```
+
+---------------------------------------
+
+<a name="sendVideoE2ee"></a>
+### api.sendVideoE2ee(input[, callback])
+
+Encrypts and sends an E2EE video. Only supported for one-to-one E2EE chats.
+
+__Arguments__
+
+* `input`: An object containing:
+    * `threadId`: Numeric user ID or @msgr JID.
+    * `data`: Buffer containing the raw video bytes.
+    * `mimeType`: (Optional) MIME type (default: `video/mp4`).
+    * `fileName`: (Optional) File name hint.
+    * `caption`: (Optional) Caption text.
+    * `replyToMessageId`: (Optional) Message ID to reply to.
+
+__Example__
+
+```js
+const fs = require("fs");
+api.sendVideoE2ee({
+  threadId: "1234567890",
+  data: fs.readFileSync("./clip.mp4")
+}, (err, res) => {
+  if (err) return console.error(err);
 });
 ```
 
@@ -1877,7 +2138,7 @@ __Example__
 
 ```js
 const fs = require("fs");
-const login = require("@VangBanLaNhat/fca-unofficial");
+const login = require("@vangbanlanhat/fca-unofficial");
 
 // Simple echo bot. This will send messages forever.
 
@@ -1927,6 +2188,25 @@ Note: This will only work if the message is sent by you and was sent less than 1
 __Arguments__
 
 * `messageID`: Message ID you want to unsend.
+
+---------------------------------------
+
+<a name="unsendMessageE2ee"></a>
+### api.unsendMessageE2ee(messageId[, callback])
+
+Revokes an E2EE message you previously sent.
+
+__Arguments__
+
+* `messageId`: Message ID you want to unsend.
+
+__Example__
+
+```js
+api.unsendMessageE2ee("mid.123...", (err) => {
+  if (err) return console.error(err);
+});
+```
 ---------------------------------------
 
 

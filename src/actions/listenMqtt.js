@@ -782,9 +782,9 @@ module.exports = function (defaultFuncs, api, ctx) {
 			msgEmitter.emit("message", message);
 		});
 
-		globalCallback = function (error, message) {
-			return rawCallback(error, message);
-		};
+		// globalCallback = function (error, message) {
+		// 	return rawCallback(error, message);
+		// };
 
 		//Reset some stuff
 		if (!ctx.firstListen) ctx.lastSeqId = null;

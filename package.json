@@ -29,11 +29,11 @@
     "bluebird": "^2.11.0",
     "cheerio": "^0.22.0",
     "https-proxy-agent": "^4.0.0",
-
     "mqtt": "^3.0.0",
     "npmlog": "^1.2.1",
     "request": "^2.88.2",
-    "websocket-stream": "^5.5.2"
+    "websocket-stream": "^5.5.2",
+    "fb-messenger-e2ee": "github:HerokeyVN/FB-Messenger-E2EE"
   },
   "pnpm": {
     "overrides": {
