@@ -153,41 +153,17 @@ function throwIfLockedOrSuspended(res, appState, jar) {
   return res;
 }
 
-function bypassAutoBehavior(res, jar, appState, globalOptions) {
+function checkAutoBehaviorCheckpoint(res, _jar, _appState, _globalOptions) {
   var url = getResponseURL(res);
-  if (url.indexOf("https://www.facebook.com/checkpoint/") === -1) return Promise.resolve(res);
-  if (url.indexOf("601051028565049") === -1) return Promise.resolve(res);
+  if (url.indexOf("https://www.facebook.com/checkpoint/") === -1) return res;
+  if (url.indexOf("601051028565049") === -1) return res;
 
-  var body = res.body || "";
-  var uid = getAppStateUserID(appState, jar);
-  var fbDtsg = utils.getFrom(body, '["DTSGInitData",[],{"token":"', '","');
-  var jazoest = utils.getFrom(body, "jazoest=", '",');
-  var lsd = utils.getFrom(body, '["LSD",[],{"token":"', '"}');
-
-  if (!fbDtsg || !jazoest || !lsd || !uid) {
-    log.warn("login", "Automated behavior checkpoint detected, but required form tokens were missing.");
-    return Promise.resolve(res);
-  }
-
-  log.warn("login", "Automated behavior checkpoint detected. Attempting to dismiss it for account " + uid + ".");
-
-  return utils
-    .post("https://www.facebook.com/api/graphql/", jar, {
-      av: uid,
-      fb_api_caller_class: "RelayModern",
-      fb_api_req_friendly_name: "FBScrapingWarningMutation",
-      variables: JSON.stringify({}),
-      server_timestamps: true,
-      doc_id: 6339492849481770,
-      fb_dtsg: fbDtsg,
-      jazoest: jazoest,
-      lsd: lsd
-    }, globalOptions)
-    .then(utils.saveCookies(jar))
-    .then(function (dismissRes) {
-      log.warn("login", "Automated behavior checkpoint dismissed. Continuing login.");
-      return dismissRes;
-    });
+  // Facebook flagged this login as automated behavior. Do not auto-dismiss
+  // the checkpoint: dismissing it programmatically is itself a bot signal.
+  // The user must verify the account in a real browser instead.
+  throw {
+    error: "Automated behavior checkpoint detected. Please verify your account in a real browser, then try logging in again."
+  };
 }
 
 function getNextPhMidnightDelayMs() {
@@ -390,9 +366,9 @@ function buildAPI(globalOptions, html, jar) {
     mqttEndpoint = "wss://edge-chat.facebook.com/chat?region=" + region.toLowerCase();
     log.warn("login", "Bypassing MQTT region with: " + region);
   } else if (!region) {
-    region = ["PRN", "PNB", "VLL", "HKG", "SIN", "FTW", "ASH"][Math.floor(Math.random() * 7)];
-    mqttEndpoint = "wss://edge-chat.facebook.com/chat?region=" + region.toLowerCase();
-    log.warn("login", "Cannot detect MQTT region. Falling back to: " + region);
+    // No region fallback: guessing a random edge region (and sending it as
+    // the MQTT region) is a bot signal. Continue without a region instead.
+    log.warn("login", "Cannot detect MQTT region. Continuing without a region.");
   }
 
   // All data available to api functions
@@ -515,7 +491,7 @@ function makeLogin(jar, email, password, loginOptions, callback, prCallback) {
           var nextURL = 'https://www.facebook.com/checkpoint/?next=https%3A%2F%2Fwww.facebook.com%2Fhome.php';
 
           return utils
-            .get(headers.location, jar, null, loginOptions)
+            .get(headers.location, jar, null, loginOptions, { requestKind: "navigation" })
             .then(utils.saveCookies(jar))
             .then(function (res) {
               var html = res.body;
@@ -724,18 +700,18 @@ function loginHelper(appState, email, password, globalOptions, callback, prCallb
 
     // Load the main page.
     mainPromise = utils
-      .get('https://www.facebook.com/', jar, null, globalOptions, { noRef: true })
+      .get('https://www.facebook.com/', jar, null, globalOptions, { noRef: true, requestKind: "navigation" })
       .then(utils.saveCookies(jar));
   } else {
     // Open the main page, then we login with the given credentials and finally
     // load the main page again (it'll give us some IDs that we need)
     mainPromise = utils
-      .get("https://www.facebook.com/", null, null, globalOptions, { noRef: true })
+      .get("https://www.facebook.com/", null, null, globalOptions, { noRef: true, requestKind: "navigation" })
       .then(utils.saveCookies(jar))
       .then(makeLogin(jar, email, password, globalOptions, callback, prCallback))
       .then(function () {
         return utils
-          .get('https://www.facebook.com/', jar, null, globalOptions)
+          .get('https://www.facebook.com/', jar, null, globalOptions, { requestKind: "navigation" })
           .then(utils.saveCookies(jar));
       });
   }
@@ -751,13 +727,13 @@ function loginHelper(appState, email, password, globalOptions, callback, prCallb
       var redirect = reg.exec(res.body);
       if (redirect && redirect[1]) {
         return utils
-          .get(redirect[1], jar, null, globalOptions)
+          .get(redirect[1], jar, null, globalOptions, { requestKind: "navigation" })
           .then(utils.saveCookies(jar));
       }
       return res;
     })
     .then(function (res) {
-      return bypassAutoBehavior(res, jar, appState, globalOptions);
+      return checkAutoBehaviorCheckpoint(res, jar, appState, globalOptions);
     })
     .then(function (res) {
       return throwIfLockedOrSuspended(res, appState, jar);
@@ -765,7 +741,7 @@ function loginHelper(appState, email, password, globalOptions, callback, prCallb
     .then(function () {
       // ws3 flow stabilizes appstate sessions by loading /home.php before building API.
       return utils
-        .get("https://www.facebook.com/home.php", jar, null, globalOptions)
+        .get("https://www.facebook.com/home.php", jar, null, globalOptions, { requestKind: "navigation" })
         .then(utils.saveCookies(jar));
     })
     .then(function (res) {
@@ -785,14 +761,14 @@ function loginHelper(appState, email, password, globalOptions, callback, prCallb
     mainPromise = mainPromise
       .then(function () {
         return utils
-          .get('https://www.facebook.com/' + ctx.globalOptions.pageID + '/messages/?section=messages&subsection=inbox', ctx.jar, null, globalOptions);
+          .get('https://www.facebook.com/' + ctx.globalOptions.pageID + '/messages/?section=messages&subsection=inbox', ctx.jar, null, globalOptions, { requestKind: "navigation" });
       })
       .then(function (resData) {
         var url = utils.getFrom(resData.body, 'window.location.replace("https:\\/\\/www.facebook.com\\', '");').split('\\').join('');
         url = url.substring(0, url.length - 1);
 
         return utils
-          .get('https://www.facebook.com' + url, ctx.jar, null, globalOptions);
+          .get('https://www.facebook.com' + url, ctx.jar, null, globalOptions, { requestKind: "navigation" });
       });
   }
 
@@ -827,7 +803,7 @@ function login(loginData, options, callback) {
     logRecordSize: defaultLogRecordSize,
     online: true,
     emitReady: false,
-    userAgent: "facebookexternalhit/1.1"
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.8103.38 Safari/537.36"
   };
 
   setOptions(globalOptions, options);
