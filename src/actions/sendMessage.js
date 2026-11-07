@@ -2,7 +2,6 @@
 
 var utils = require("../utils");
 var log = require("npmlog");
-var path = require("path");
 
 var createUploadAttachment = require("../service/uploadAttachment");
 
@@ -21,38 +20,6 @@ module.exports = function (defaultFuncs, api, ctx) {
   var sendMessageUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3";
 
   var uploadAttachment = createUploadAttachment(defaultFuncs, ctx, log);
-
-  function streamToBuffer(stream) {
-    return new Promise(function (resolve, reject) {
-      var chunks = [];
-      stream.on("data", function (chunk) {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-      });
-      stream.on("end", function () {
-        resolve(Buffer.concat(chunks));
-      });
-      stream.on("error", reject);
-    });
-  }
-
-  function detectMediaFromAttachment(attachment) {
-    var filename = attachment && typeof attachment.path === "string"
-      ? path.basename(attachment.path)
-      : "file.bin";
-    var lower = filename.toLowerCase();
-
-    if (/\.(jpe?g|png|gif|webp)$/.test(lower)) {
-      return { mediaType: "image", filename: filename };
-    }
-    if (/\.(mp4|mov|mkv|webm)$/.test(lower)) {
-      return { mediaType: "video", filename: filename };
-    }
-    if (/\.(mp3|m4a|aac|ogg|wav|flac)$/.test(lower)) {
-      return { mediaType: "audio", filename: filename };
-    }
-
-    return { mediaType: "document", filename: filename };
-  }
 
   function getUrl(url, callback) {
     var form = {

@@ -20,7 +20,7 @@ module.exports = function (defaultFuncs, api, ctx) {
           return { 
             userID: v, 
             url: res.data.url 
-          }
+          };
         })
         .catch(function (err) {
           return cb(err);
@@ -61,7 +61,7 @@ module.exports = function (defaultFuncs, api, ctx) {
     if (!ctx.access_token) {
       log.error('getAvatarUser', 'Cant get access_token');
       return cb('Cant get access_token');
-    };
+    }
     
     handleAvatar(userIDs, height, width)
       .then(function (res) {
@@ -73,5 +73,5 @@ module.exports = function (defaultFuncs, api, ctx) {
       });
 
     return rtPromise;
-  }
-}
+  };
+};

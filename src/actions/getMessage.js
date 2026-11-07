@@ -21,7 +21,7 @@ function formatMessage(threadID, data) {
         timestamp: data.timestamp_precise,
         author: data.message_sender.id,
       };
-    case "ThreadImageMessage":
+    case "ThreadImageMessage": {
       const metadata = data.image_with_metadata;
       return {
         type: "event",
@@ -45,6 +45,7 @@ function formatMessage(threadID, data) {
         timestamp: data.timestamp_precise,
         author: data.message_sender.id,
       };
+    }
     case "GenericAdminTextMessage":
       switch (data.extensible_message_admin_text_type) {
         case "CHANGE_THREAD_THEME":
@@ -69,7 +70,7 @@ function formatMessage(threadID, data) {
             timestamp: data.timestamp_precise,
             author: data.message_sender.id,
           };
-        case "CHANGE_THREAD_ICON":
+        case "CHANGE_THREAD_ICON": {
           const thread_icon = data.extensible_message_admin_text.thread_icon;
           return {
             type: "event",
@@ -86,6 +87,7 @@ function formatMessage(threadID, data) {
             timestamp: data.timestamp_precise,
             author: data.message_sender.id,
           };
+        }
         case "CHANGE_THREAD_NICKNAME":
           return {
             type: "event",
@@ -100,7 +102,7 @@ function formatMessage(threadID, data) {
             timestamp: data.timestamp_precise,
             author: data.message_sender.id,
           };
-        case "GROUP_POLL":
+        case "GROUP_POLL": {
           const question = data.extensible_message_admin_text.question;
           return {
             type: "event",
@@ -131,6 +133,7 @@ function formatMessage(threadID, data) {
             timestamp: data.timestamp_precise,
             author: data.message_sender.id,
           };
+        }
         default:
           throw new Error(
             `Unknown admin text type: "${data.extensible_message_admin_text_type}", if this happens to you let me know when it happens. Please open an issue at https://github.com/ntkhang03/fb-chat-api/issues.`,

@@ -22,7 +22,7 @@ module.exports = function (http, api, ctx) {
     var returnPromise = new Promise(function (resolve, reject) {
       cb = function (error, data) {
         data ? resolve(data) : reject(error);
-      }
+      };
     });
 
     if (typeof callback == 'function') cb = callback;
@@ -36,7 +36,7 @@ module.exports = function (http, api, ctx) {
         query
       }),
       doc_id: '4642836929159953'
-    }
+    };
     http
       .post('https://www.facebook.com/api/graphql/', ctx.jar, form)
       .then(utils.parseAndCheckLogin(ctx, http))
@@ -48,6 +48,6 @@ module.exports = function (http, api, ctx) {
         return cb(err);
       });
     return returnPromise;
-  }
-}
+  };
+};
 
