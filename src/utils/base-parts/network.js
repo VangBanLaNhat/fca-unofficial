@@ -27,19 +27,43 @@ function getHeaders(url, options, ctx, customHeader) {
     ? customHeader.customUserAgent
     : options.userAgent;
 
+  // Page loads (navigation) and API calls (XHR) send different header sets;
+  // one frozen template for both is a browser fingerprint mismatch.
+  // Callers mark page loads with requestKind: "navigation"; anything else
+  // defaults to XHR.
+  var requestKind = "xhr";
+  if (customHeader && customHeader.requestKind === "navigation") {
+    requestKind = "navigation";
+  } else if (ctx && ctx.requestKind === "navigation") {
+    requestKind = "navigation";
+  }
+
   var headers = {
     host: host,
-    accept: "*/*",
-    "accept-language": "vi",
+    "accept-language": "en-US,en;q=0.9",
     referer: "https://www.facebook.com/",
-    origin: "https://www.facebook.com",
     connection: "keep-alive",
+    "accept-encoding": "gzip, deflate, br",
     "Sec-Fetch-Site": "same-origin",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Dest": "empty",
-    "Sec-Fetch-User": "?1",
+    "Sec-CH-UA": "\"Google Chrome\";v=\"157\", \"Chromium\";v=\"157\", \"Not-A.Brand\";v=\"24\"",
+    "Sec-CH-UA-Mobile": "?0",
+    "Sec-CH-UA-Platform": "\"Windows\"",
     "User-Agent": userAgent
   };
+
+  if (requestKind === "navigation") {
+    headers.accept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
+    headers["Sec-Fetch-Mode"] = "navigate";
+    headers["Sec-Fetch-Dest"] = "document";
+    // No Origin header and no Sec-Fetch-User on navigations.
+  } else {
+    headers.accept = "*/*";
+    headers.origin = "https://www.facebook.com";
+    headers["Sec-Fetch-Mode"] = "cors";
+    headers["Sec-Fetch-Dest"] = "empty";
+    // No Sec-Fetch-User on XHR: browsers only send it on navigations.
+  }
+
   if (customHeader) {
     Object.assign(headers, customHeader);
     if (customHeader.noRef) {
@@ -47,14 +71,17 @@ function getHeaders(url, options, ctx, customHeader) {
     }
     delete headers.customUserAgent;
     delete headers.noRef;
+    delete headers.requestKind;
   }
-  if (ctx && ctx.region) {
-    headers["X-MSGR-Region"] = ctx.region;
+  if (ctx && ctx.noRef) {
+    delete headers.referer;
   }
 
-  headers["x-asbd-id"] = (ctx && ctx.globalOptions && ctx.globalOptions.asbdID)
-    ? String(ctx.globalOptions.asbdID)
-    : "359341";
+  // x-asbd-id is only sent when explicitly configured; the old hardcoded
+  // default ("359341") was identical for every install.
+  if (ctx && ctx.globalOptions && ctx.globalOptions.asbdID) {
+    headers["x-asbd-id"] = String(ctx.globalOptions.asbdID);
+  }
 
   if (ctx && ctx.lsd) {
     headers["x-fb-lsd"] = ctx.lsd;

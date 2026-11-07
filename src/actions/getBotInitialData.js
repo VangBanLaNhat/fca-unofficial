@@ -1,6 +1,5 @@
 "use strict";
 
-var utils = require("../utils");
 var log = require("npmlog");
 
 module.exports = function (_defaultFuncs, api, ctx) {
@@ -22,7 +21,7 @@ module.exports = function (_defaultFuncs, api, ctx) {
     api.httpGet(
       "https://www.facebook.com/profile.php?id=" + ctx.userID,
       null,
-      { customUserAgent: utils.windowsUserAgent },
+      { requestKind: "navigation" },
       function (err, html) {
         if (err) {
           log.error("getBotInitialData", err);

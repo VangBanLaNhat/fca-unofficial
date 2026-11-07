@@ -17,8 +17,6 @@ var allowedProperties = {
 };
 
 module.exports = function (defaultFuncs, api, ctx) {
-  var sendMessageUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3";
-
   var uploadAttachment = createUploadAttachment(defaultFuncs, ctx, log);
 
   function getUrl(url, callback) {
@@ -96,12 +94,11 @@ module.exports = function (defaultFuncs, api, ctx) {
         form,
         null,
         {
-          customUserAgent: sendMessageUserAgent,
+          customUserAgent: ctx.globalOptions.userAgent,
           Referer: "https://www.facebook.com/",
           Origin: "https://www.facebook.com",
           Connection: "keep-alive",
-          "Sec-Fetch-Site": "same-origin",
-          "Sec-Fetch-User": "?1"
+          "Sec-Fetch-Site": "same-origin"
         }
       )
       .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
