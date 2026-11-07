@@ -5,14 +5,7 @@ var log = require("npmlog");
 var createUploadAttachment = require("../service/uploadAttachment");
 
 module.exports = function (defaultFuncs, _api, ctx) {
-  var mqttVariance = 0;
-
   var uploadAttachment = createUploadAttachment(defaultFuncs, ctx, log);
-
-  function mqttEpochID() {
-    mqttVariance = (mqttVariance + 0.1) % 5;
-    return Math.floor(Date.now() * (4194304 + mqttVariance));
-  }
 
   return function sendMessageMqtt(msg, threadID, callback, replyToMessage) {
     if (!ctx.mqttClient || !ctx.mqttClient.connected) {
@@ -21,9 +14,7 @@ module.exports = function (defaultFuncs, _api, ctx) {
 
     var emojiSizes = { small: 1, medium: 2, large: 3 };
     var threadIDString = threadID.toString();
-    var timestamp = Date.now();
-    var epoch = timestamp << 22;
-    var otid = epoch + Math.floor(Math.random() * 4194304);
+    var otid = utils.generateOtid();
 
     var form = {
       app_id: "2220391788200892",
@@ -57,11 +48,11 @@ module.exports = function (defaultFuncs, _api, ctx) {
             failure_count: null
           }
         ],
-        epoch_id: mqttEpochID(),
-        version_id: "6120284488008082",
-        data_trace_id: null
+        epoch_id: utils.generateOtid(),
+        version_id: utils.lightspeedVersionId,
+        data_trace_id: utils.generateDataTraceId()
       },
-      request_id: 1,
+      request_id: utils.getNextWsRequestId(ctx),
       type: 3
     };
 
@@ -160,7 +151,7 @@ module.exports = function (defaultFuncs, _api, ctx) {
         label: "46",
         payload: {
           thread_id: threadIDString,
-          otid: (otid + 1).toString(),
+          otid: (BigInt(otid) + 1n).toString(),
           source: 0,
           send_type: 3,
           sync_group: 1,

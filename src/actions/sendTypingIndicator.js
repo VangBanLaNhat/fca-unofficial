@@ -1,5 +1,7 @@
 "use strict";
 
+var utils = require("../utils");
+
 module.exports = function (_defaultFuncs, _api, ctx) {
   function publishTypingPacket(wsContent) {
     return new Promise(function (resolve, reject) {
@@ -42,9 +44,9 @@ module.exports = function (_defaultFuncs, _api, ctx) {
             is_typing: +!!sendTyping,
             attribution: 0
           }),
-          version: 5849951561777440
+          version: Number(utils.lightspeedVersionId)
         }),
-        request_id: 1,
+        request_id: utils.getNextWsRequestId(ctx),
         type: 4
       };
 

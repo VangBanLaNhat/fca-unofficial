@@ -3,6 +3,7 @@
 var utils = require("../utils");
 var log = require("npmlog");
 var mqtt = require('mqtt');
+var crypto = require("crypto");
 var websocket = require('websocket-stream');
 var HttpsProxyAgent = require('https-proxy-agent');
 const EventEmitter = require('events');
@@ -27,7 +28,8 @@ var topics = ["/legacy_web",
 	"/messaging_events",
 	"/orca_message_notifications",
 	"/pp",
-	"/webrtc_response"
+	"/webrtc_response",
+	"/ls_resp"
 ];
 
 /* [ Noti ? ]
@@ -56,10 +58,15 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
 	function scheduleReconnect() {
 		if (ctx._stopListening || !ctx.globalOptions.autoReconnect || ctx._mqttReconnectPending) return;
 		ctx._mqttReconnectPending = true;
+		// Exponential backoff with jitter: 1s, 2s, 4s ... capped at 60s.
+		// A fixed 1s retry loop is trivially distinguishable from a browser.
+		var delay = ctx._mqttReconnectDelay || 1000;
+		var jitteredDelay = Math.floor(delay * (0.5 + Math.random()));
+		ctx._mqttReconnectDelay = Math.min(delay * 2, 60000);
 		setTimeout(function () {
 			ctx._mqttReconnectPending = false;
 			getSeqID();
-		}, 1000);
+		}, jitteredDelay);
 	}
 
 	function cleanupMqttClient() {
@@ -90,17 +97,23 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
 	else if (ctx.region) host = `wss://edge-chat.facebook.com/chat?region=${ctx.region.toLocaleLowerCase()}&sid=${sessionID}&cid=${clientID}`;
 	else host = `wss://edge-chat.facebook.com/chat?sid=${sessionID}&cid=${clientID}`;
    
+	// One stable MQTT client id per login, reused across reconnects. A fresh
+	// random id on every connect looks like a brand-new device each time.
+	if (!ctx.mqttClientId) {
+		ctx.mqttClientId = crypto.randomUUID();
+	}
+
 	var options = {
-		clientId: "mqttwsclient",
-		protocolId: 'MQIsdp',
-		protocolVersion: 3,
+		clientId: ctx.mqttClientId,
+		protocolId: 'MQTT',
+		protocolVersion: 4,
 		username: JSON.stringify(username),
 		clean: true,
 		wsOptions: {
 			headers: {
 				'Cookie': cookies,
 				'Origin': 'https://www.facebook.com',
-				'User-Agent': (ctx.globalOptions.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36'),
+				'User-Agent': (ctx.globalOptions.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.8103.38 Safari/537.36'),
 				'Referer': 'https://www.facebook.com/',
 				'Host': new URL(host).hostname //'edge-chat.facebook.com'
 			},
@@ -110,7 +123,7 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
 		keepalive: 10,
 		reschedulePings: true,
 		connectTimeout: 10000,
-		reconnectPeriod: 1000
+		reconnectPeriod: 0
 	};
 
 	if (typeof ctx.globalOptions.proxy != "undefined") {
@@ -135,7 +148,8 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
 	});
 
 	mqttClient.on('connect', function () {
-		topics.forEach(topicsub => mqttClient.subscribe(topicsub));
+		ctx._mqttReconnectDelay = 1000;
+		topics.forEach(topicsub => mqttClient.subscribe(topicsub, { qos: 1 }));
 
 		var topic;
 		var queue = {
@@ -173,37 +187,6 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
 				globalCallback(null, { type: "ready", error: null });
 			}
 			maybeEmitFullyReady();
-
-			// Fake telemetry to mimic real browser
-			if (!ctx.screenTimeSent) {
-				ctx.screenTimeSent = true;
-				var form = {
-					"av": ctx.globalOptions.pageID,
-					"queries": JSON.stringify({
-						"o0": {
-							"doc_id": "30984609371137911",
-							"query_params": {}
-						},
-						"o1": {
-							"doc_id": "9691594727545032",
-							"query_params": {}
-						},
-						"o2": {
-							"doc_id": "9714526941947209",
-							"query_params": {}
-						}
-					}),
-					"batch_name": "MessengerGraphQLTelemetryBatch"
-				};
-				defaultFuncs
-					.post("https://www.facebook.com/api/graphqlbatch/", ctx.jar, form)
-					.then(function() {
-						log.info("listenMqtt", "ScreenTime and Badge telemetry queries sent.");
-					})
-					.catch(function(err) {
-						log.error("listenMqtt", "Failed to send telemetry queries: " + err);
-					});
-			}
 
 			delete ctx.tmsWait;
 		};

@@ -8,8 +8,7 @@ module.exports = function (_defaultFuncs, _api, ctx) {
       return callback(new Error("Not connected to MQTT"));
     }
 
-    var reqID = ctx.wsReqNumber + 1;
-    ctx.wsReqNumber += 1;
+    var reqID = utils.getNextWsRequestId(ctx);
     ctx.wsTaskNumber += 1;
 
     var taskPayload = {
@@ -20,7 +19,7 @@ module.exports = function (_defaultFuncs, _api, ctx) {
       actor_id: ctx.userID,
       reaction_style: null,
       sync_group: 1,
-      send_attribution: Math.random() < 0.5 ? 65537 : 524289
+      send_attribution: utils.reactionSendAttribution
     };
 
     var task = {
@@ -34,10 +33,10 @@ module.exports = function (_defaultFuncs, _api, ctx) {
     var content = {
       app_id: "2220391788200892",
       payload: JSON.stringify({
-        data_trace_id: null,
-        epoch_id: parseInt(utils.generateOfflineThreadingID(), 10),
+        data_trace_id: utils.generateDataTraceId(),
+        epoch_id: utils.generateOtid(),
         tasks: [task],
-        version_id: "7158486590867448"
+        version_id: utils.lightspeedVersionId
       }),
       request_id: ctx.wsReqNumber,
       type: 3

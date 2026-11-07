@@ -1,5 +1,15 @@
 "use strict";
 
+var crypto = require("crypto");
+
+// Single Lightspeed client version shared by the send, reaction and typing
+// paths. Previously each path used a different frozen version_id.
+var lightspeedVersionId = "6120284488008082";
+
+// Fixed attribution for message reactions. A real client uses one
+// deterministic attribution per client/surface, never a coin flip.
+var reactionSendAttribution = 65537;
+
 function padZeros(val, len) {
   val = String(val);
   len = len || 2;
@@ -140,13 +150,24 @@ function generateAccessiblityCookie() {
 }
 
 function getGUID() {
-  var sectionLength = Date.now();
-  var id = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
-    var r = Math.floor((sectionLength + Math.random() * 16) % 16);
-    sectionLength = Math.floor(sectionLength / 16);
-    return (c == "x" ? r : (r & 7) | 8).toString(16);
-  });
-  return id;
+  return crypto.randomUUID();
+}
+
+function generateOtid() {
+  // 64-bit otid: (milliseconds << 22) | 22 random bits. Must use BigInt:
+  // the << operator coerces to int32 and destroys the timestamp.
+  return ((BigInt(Date.now()) << 22n) | BigInt(Math.floor(Math.random() * 4194304))).toString();
+}
+
+function generateDataTraceId() {
+  return crypto.randomUUID();
+}
+
+function getNextWsRequestId(ctx) {
+  // One shared, monotonically increasing request counter per connection,
+  // used by the send, reaction and typing paths alike.
+  ctx.wsReqNumber = (ctx.wsReqNumber || 0) + 1;
+  return ctx.wsReqNumber;
 }
 
 function getSignatureID() {
@@ -165,5 +186,10 @@ module.exports = {
   generateAccessiblityCookie,
   getGUID,
   getSignatureID,
-  generateTimestampRelative
+  generateTimestampRelative,
+  lightspeedVersionId,
+  reactionSendAttribution,
+  generateOtid,
+  generateDataTraceId,
+  getNextWsRequestId
 };
